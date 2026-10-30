@@ -6,7 +6,6 @@ from selenium_stealth import stealth
 from bs4 import BeautifulSoup
 import json
 import re
-import time
 
 def parse_ozon_product(url: str):
     options = uc.ChromeOptions()
@@ -15,7 +14,8 @@ def parse_ozon_product(url: str):
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
     
-    driver = uc.Chrome(options=options, version_main=137)  # Укажи свою версию Chrome, если потребуется
+    # Тут убрана привязка к версии, драйвер сам подхватит нужную
+    driver = uc.Chrome(options=options)
 
     # Включаем стелс-режим
     stealth(driver,
@@ -28,7 +28,7 @@ def parse_ozon_product(url: str):
 
     try:
         driver.get(url)
-        # Ждем загрузки ключевого элемента (например, блока с ценой)
+        # Ждем загрузки ключевого элемента (блока с ценой)
         WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-widget='webPrice']"))
         )
@@ -84,6 +84,6 @@ def parse_ozon_product(url: str):
         driver.quit()
 
 if __name__ == "__main__":
-    # Пример использования
-    test_url = "https://www.ozon.ru/product/..."  # Замени на реальную ссылку
+    # ВСТАВЬ СЮДА ССЫЛКУ НА ЛЮБОЙ ТОВАР С OZON
+    test_url = "https://www.ozon.ru/product/1156624388/" 
     parse_ozon_product(test_url)
