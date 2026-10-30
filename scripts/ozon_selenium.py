@@ -1,82 +1,61 @@
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium_stealth import stealth
+from seleniumbase import SB
 from bs4 import BeautifulSoup
 import json
 import re
 import time
 
 def parse_ozon_product(url: str):
-    options = uc.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    
-    # use_subprocess=False и headless=True работают в связке с xvfb
-    driver = uc.Chrome(options=options, use_subprocess=False, headless=True)
+    # SeleniumBase с CDP-режимом — самый надежный способ обхода защиты Ozon
+    with SB(uc=True, headless=True) as sb:
+        try:
+            # Открываем страницу в невидимом режиме с обходом детекта
+            sb.uc_open_with_reconnect(url, reconnect_time=4)
+            
+            # Ждем загрузки ключевого элемента
+            sb.wait_for_element("div[data-widget='webPrice']", timeout=30)
+            time.sleep(3) # Даем время на подгрузку динамики
 
-    stealth(driver,
-            languages=["ru-RU", "ru"],
-            vendor="Google Inc.",
-            platform="Win32",
-            webgl_vendor="Intel Inc.",
-            renderer="Intel Iris OpenGL Engine",
-            fix_hairline=True)
+            html = sb.get_page_source()
+            soup = BeautifulSoup(html, "html.parser")
 
-    try:
-        driver.get(url)
-        WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-widget='webPrice']"))
-        )
-        
-        time.sleep(3) 
-        
-        html = driver.page_source
-        soup = BeautifulSoup(html, "html.parser")
+            # Извлечение данных
+            title_tag = soup.find("h1")
+            name = title_tag.get_text(strip=True) if title_tag else "Название не найдено"
 
-        title_tag = soup.find("h1")
-        name = title_tag.get_text(strip=True) if title_tag else "Название не найдено"
+            price_block = soup.find("div", {"data-widget": "webPrice"})
+            price = "Цена не найдена"
+            if price_block:
+                price_text = price_block.get_text(" ", strip=True)
+                match = re.search(r"(\d[\d\s]*)\s*₽", price_text)
+                if match:
+                    price = match.group(0).strip()
 
-        price_block = soup.find("div", {"data-widget": "webPrice"})
-        price = "Цена не найдена"
-        if price_block:
-            price_text = price_block.get_text(" ", strip=True)
-            match = re.search(r"(\d[\d\s]*)\s*₽", price_text)
-            if match:
-                price = match.group(0).strip()
+            img_tag = soup.find("img", {"data-widget": "webGallery"})
+            image_url = img_tag["src"] if img_tag and img_tag.has_attr("src") else "Картинка не найдена"
+            
+            if image_url == "Картинка не найдена":
+                json_ld = soup.find("script", {"type": "application/ld+json"})
+                if json_ld:
+                    try:
+                        data = json.loads(json_ld.string)
+                        if isinstance(data, list):
+                            data = data[0]
+                        image_url = data.get("image", image_url)
+                    except Exception:
+                        pass
 
-        img_tag = soup.find("img", {"data-widget": "webGallery"})
-        image_url = img_tag["src"] if img_tag and img_tag.has_attr("src") else "Картинка не найдена"
-        
-        if image_url == "Картинка не найдена":
-            json_ld = soup.find("script", {"type": "application/ld+json"})
-            if json_ld:
-                try:
-                    data = json.loads(json_ld.string)
-                    if isinstance(data, list):
-                        data = data[0]
-                    image_url = data.get("image", image_url)
-                except Exception:
-                    pass
+            result = {
+                "url": url,
+                "name": name,
+                "price": price,
+                "image": image_url
+            }
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return result
 
-        result = {
-            "url": url,
-            "name": name,
-            "price": price,
-            "image": image_url
-        }
-        
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-        return result
-
-    except Exception as e:
-        print(f"Ошибка при парсинге {url}: {e}")
-        return None
-    finally:
-        driver.quit()
+        except Exception as e:
+            print(f"Ошибка при парсинге {url}: {e}")
+            return None
 
 if __name__ == "__main__":
     test_url = "https://www.ozon.ru/product/1156624388/" 
