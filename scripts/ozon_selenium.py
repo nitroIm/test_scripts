@@ -10,14 +10,13 @@ import time
 
 def parse_ozon_product(url: str):
     options = uc.ChromeOptions()
-    # Убираем headless, запустим через xvfb
-    # options.add_argument("--headless=new") 
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     
-    # use_subprocess=False часто решает проблему с подключением
-    driver = uc.Chrome(options=options, use_subprocess=False)
+    # use_subprocess=False и headless=True работают в связке с xvfb
+    driver = uc.Chrome(options=options, use_subprocess=False, headless=True)
 
     stealth(driver,
             languages=["ru-RU", "ru"],
@@ -29,18 +28,15 @@ def parse_ozon_product(url: str):
 
     try:
         driver.get(url)
-        # Увеличиваем таймаут ожидания, так как сайт тяжелый
-        WebDriverWait(driver, 25).until(
+        WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-widget='webPrice']"))
         )
         
-        # Небольшая пауза для подгрузки динамики
-        time.sleep(2) 
+        time.sleep(3) 
         
         html = driver.page_source
         soup = BeautifulSoup(html, "html.parser")
 
-        # --- Извлечение данных ---
         title_tag = soup.find("h1")
         name = title_tag.get_text(strip=True) if title_tag else "Название не найдено"
 
@@ -83,6 +79,5 @@ def parse_ozon_product(url: str):
         driver.quit()
 
 if __name__ == "__main__":
-    # Ссылка на любой товар Ozon
     test_url = "https://www.ozon.ru/product/1156624388/" 
     parse_ozon_product(test_url)
