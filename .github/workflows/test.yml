@@ -15,11 +15,11 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Setup Chrome
-        uses: browser-actions/setup-chrome@v1
-
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          pip install -r requirements.txt
 
-      - name: Run Selenium script
-        run: python scripts/ozon_selenium.py
+      - name: Run script with virtual display
+        run: xvfb-run --auto-servernum python scripts/ozon_selenium.py
