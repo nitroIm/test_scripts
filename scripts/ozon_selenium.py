@@ -6,18 +6,19 @@ from selenium_stealth import stealth
 from bs4 import BeautifulSoup
 import json
 import re
+import time
 
 def parse_ozon_product(url: str):
     options = uc.ChromeOptions()
-    options.add_argument("--headless=new")  # Фоновый режим
+    # Убираем headless, запустим через xvfb
+    # options.add_argument("--headless=new") 
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
     
-    # Тут убрана привязка к версии, драйвер сам подхватит нужную
-    driver = uc.Chrome(options=options)
+    # use_subprocess=False часто решает проблему с подключением
+    driver = uc.Chrome(options=options, use_subprocess=False)
 
-    # Включаем стелс-режим
     stealth(driver,
             languages=["ru-RU", "ru"],
             vendor="Google Inc.",
@@ -28,34 +29,32 @@ def parse_ozon_product(url: str):
 
     try:
         driver.get(url)
-        # Ждем загрузки ключевого элемента (блока с ценой)
-        WebDriverWait(driver, 15).until(
+        # Увеличиваем таймаут ожидания, так как сайт тяжелый
+        WebDriverWait(driver, 25).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-widget='webPrice']"))
         )
+        
+        # Небольшая пауза для подгрузки динамики
+        time.sleep(2) 
         
         html = driver.page_source
         soup = BeautifulSoup(html, "html.parser")
 
         # --- Извлечение данных ---
-        # Название
         title_tag = soup.find("h1")
         name = title_tag.get_text(strip=True) if title_tag else "Название не найдено"
 
-        # Цена (ищем в блоке с data-widget="webPrice")
         price_block = soup.find("div", {"data-widget": "webPrice"})
         price = "Цена не найдена"
         if price_block:
             price_text = price_block.get_text(" ", strip=True)
-            # Ищем первое вхождение числа с ₽ (например, "1 151 ₽")
             match = re.search(r"(\d[\d\s]*)\s*₽", price_text)
             if match:
                 price = match.group(0).strip()
 
-        # Картинка (ищем первое большое изображение в галерее)
         img_tag = soup.find("img", {"data-widget": "webGallery"})
         image_url = img_tag["src"] if img_tag and img_tag.has_attr("src") else "Картинка не найдена"
         
-        # Если картинка в src не найдена, пробуем вытащить из JSON-LD
         if image_url == "Картинка не найдена":
             json_ld = soup.find("script", {"type": "application/ld+json"})
             if json_ld:
@@ -84,6 +83,6 @@ def parse_ozon_product(url: str):
         driver.quit()
 
 if __name__ == "__main__":
-    # ВСТАВЬ СЮДА ССЫЛКУ НА ЛЮБОЙ ТОВАР С OZON
+    # Ссылка на любой товар Ozon
     test_url = "https://www.ozon.ru/product/1156624388/" 
     parse_ozon_product(test_url)
