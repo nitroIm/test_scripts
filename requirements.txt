@@ -1,4 +1,2 @@
-selenium
-undetected-chromedriver
-selenium-stealth
+seleniumbase
 beautifulsoup4
