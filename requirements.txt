@@ -1,2 +1,6 @@
+requests
+dnspython
+urllib3
+python-whois
 seleniumbase
 beautifulsoup4
