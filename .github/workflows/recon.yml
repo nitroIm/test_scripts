@@ -1,0 +1,29 @@
+name: Universal Recon
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Домен для сканирования (например, ozon.ru)'
+        required: true
+        default: 'ozon.ru'
+
+jobs:
+  run-recon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Recon
+        env:
+          TARGET_URL: ${{ github.event.inputs.target_url }}
+        run: python scripts/recon.py
