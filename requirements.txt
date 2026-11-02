@@ -4,3 +4,5 @@ urllib3
 python-whois
 seleniumbase
 beautifulsoup4
+requests
+telethon
