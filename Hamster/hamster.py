@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+import urllib.parse
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import RequestAppWebViewRequest
@@ -12,7 +13,6 @@ api_hash = os.environ.get("TG_API_HASH")
 session_str = os.environ.get("TG_SESSION")
 
 async def main():
-    print("Подключаемся к Telegram...")
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
     await client.connect()
 
@@ -21,8 +21,7 @@ async def main():
         return
 
     try:
-        bot_username = "hamsterking_game_bot"
-        bot = await client.get_entity(bot_username)
+        bot = await client.get_entity("hamsterking_game_bot")
         input_user = await client.get_input_entity(bot)
         app = InputBotAppShortName(bot_id=input_user, short_name="start")
         
@@ -30,19 +29,14 @@ async def main():
             peer=input_user, app=app, platform="android", write_allowed=True
         ))
         game_url = web_view.url
-        print(f"Ссылка от Telegram: {game_url[:80]}...")
 
-        # Извлекаем hash с токеном (tgWebAppData=...)
-        if "#tgWebAppData=" in game_url:
-            hash_part = game_url.split("#")[1]
-            # Формируем ПРЯМУЮ ссылку на игру
-            direct_url = f"https://cdn-prod-front.hwgame.cloud/app_2104.html#{hash_part}"
-        else:
-            print("❌ Токен не найден в ссылке.")
-            return
+        # Вытаскиваем initData (токен)
+        init_data = urllib.parse.unquote(game_url.split("tgWebAppData=")[1].split("&tgWebAppVersion")[0])
+        
+        # Формируем правильный URL
+        direct_url = f"https://cdn-prod-front.hwgame.cloud/app_2104.html#tgWebAppData={urllib.parse.quote(init_data)}"
 
-        print(f"Открываем прямой URL: {direct_url[:80]}...")
-
+        print("Запускаем Playwright с подделкой Telegram.WebApp...")
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
@@ -52,34 +46,47 @@ async def main():
                 viewport={"width": 390, "height": 844},
                 user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             )
-            
+
+            # Внедряем фейковый объект Telegram, чтобы игра не редиректила
+            script = f"""
+                window.Telegram = {{
+                    WebApp: {{
+                        initData: "{init_data}",
+                        initDataUnsafe: {{}},
+                        ready: function() {{}},
+                        expand: function() {{}},
+                        close: function() {{}},
+                        platform: "android"
+                    }}
+                }};
+            """
+            await context.add_init_script(script)
+
             page = await context.new_page()
 
-            # Слушаем WebSockets (там 100% будут данные игры)
+            # Блокируем редирект на лендинг
+            await page.route("**/hamsterking.games/**", lambda route: route.abort())
+
+            # Слушаем WebSockets
             def handle_websocket(ws):
                 print(f"\n🌐 WEBSOCKET: {ws.url}")
-                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:500]}"))
-                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:500]}"))
+                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:300]}"))
 
             page.on("websocket", handle_websocket)
 
             print("Загружаем игру...")
             await page.goto(direct_url)
-            
-            print("Ждем загрузки и обмена данными (40 секунд)...")
             await page.wait_for_timeout(40000)
-            
+
             print(f"URL игры: {page.url}")
 
-            # Вытаскиваем IndexedDB (там Unity хранит сохранения)
-            print("\n🔍 Пытаемся вытащить данные из IndexedDB...")
+            print("\n🔍 Проверяем IndexedDB...")
             try:
                 dbs = await page.evaluate("indexedDB.databases()")
-                print(f"Найдено баз данных: {dbs}")
+                print(f"Базы данных: {dbs}")
             except Exception as e:
-                print(f"Ошибка IndexedDB: {e}")
+                print(f"Ошибка: {e}")
 
-            print("\nГотово!")
             await browser.close()
             
     except Exception as e:
