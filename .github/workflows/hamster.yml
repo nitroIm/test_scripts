@@ -30,7 +30,7 @@ jobs:
           TG_SESSION: ${{ secrets.TG_SESSION }}
         run: python Hamster/hamster.py
 
-      - name: Commit and push debug files
+      - name: Commit debug files
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
