@@ -22,12 +22,15 @@ async def main():
 
     print("✅ Авторизован. Открываем Hamster Kombat...")
     try:
+        # Получаем сущность бота
         bot = await client.get_entity("hamster_kombat_bot")
+        # Получаем input_entity для надежности
+        peer = await client.get_input_entity(bot)
         
-        # Открываем мини-приложение как с Android
+        # Открываем мини-приложение
         app = InputBotAppShortName(bot_id=bot.id, short_name="start")
         web_view = await client(RequestAppWebViewRequest(
-            peer=bot,
+            peer=peer,
             app=app,
             platform="android",
             write_allowed=True
@@ -36,31 +39,23 @@ async def main():
         url = web_view.url
         
         if "tgWebAppData=" in url:
-            # Вытаскиваем и декодируем initData
             init_data = url.split("tgWebAppData=")[1].split("&tgWebAppVersion")[0]
             decoded_data = urllib.parse.unquote(init_data)
             
             print("\n" + "="*50)
             print("🎉 РАЗВЕДКА УСПЕШНА! Данные получены.")
             
-            # Пытаемся распарсить JSON с данными юзера внутри initData
             try:
-                # initData выглядит как строка параметров, разделенных &
                 params = dict(urllib.parse.parse_qsl(decoded_data))
                 if 'user' in params:
                     user_info = json.loads(params['user'])
                     print(f"👤 Игрок: {user_info.get('first_name')} (@{user_info.get('username')})")
-                    print(f"🆔 ID в Telegram: {user_info.get('id')}")
-                    print(f"🌍 Язык: {user_info.get('language_code')}")
-                    
-                    # В некоторых версиях там же лежат данные об игре
-                    if 'game' in user_info:
-                         print("🎮 Данные игры найдены в токене!")
+                    print(f"🆔 ID: {user_info.get('id')}")
             except Exception as e:
-                print(f"Не удалось распарсить данные юзера: {e}")
+                print(f"Не удалось распарсить данные: {e}")
 
-            print("\n⚠️ СКОПИРУЙ ЭТОТ ТОКЕН (он понадобится для тапов):")
-            print(f"INIT_DATA: {init_data}")
+            print("\n⚠️ ТОКЕН ПОЛУЧЕН (нужен для тапов):")
+            print(f"INIT_DATA: {init_data[:50]}...")
             print("="*50 + "\n")
             
         else:
