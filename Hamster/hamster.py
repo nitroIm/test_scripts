@@ -1,6 +1,5 @@
 import os
 import asyncio
-import urllib.parse
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import RequestAppWebViewRequest
@@ -12,7 +11,7 @@ api_hash = os.environ.get("TG_API_HASH")
 session_str = os.environ.get("TG_SESSION")
 
 async def main():
-    print("Подключаемся к Telegram через Telethon...")
+    print("Подключаемся к Telegram...")
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
     await client.connect()
 
@@ -22,20 +21,14 @@ async def main():
 
     try:
         bot_username = "hamsterking_game_bot"
-        print(f"Ищем бота @{bot_username}...")
         bot = await client.get_entity(bot_username)
         input_user = await client.get_input_entity(bot)
-        
         app = InputBotAppShortName(bot_id=input_user, short_name="start")
-        web_view = await client(RequestAppWebViewRequest(
-            peer=input_user,
-            app=app,
-            platform="android",
-            write_allowed=True
-        ))
         
+        web_view = await client(RequestAppWebViewRequest(
+            peer=input_user, app=app, platform="android", write_allowed=True
+        ))
         game_url = web_view.url
-        print(f"✅ Получена ссылка на игру.")
 
         print("Запускаем Playwright...")
         async with async_playwright() as p:
@@ -48,23 +41,28 @@ async def main():
 
             print("Открываем стартовый экран...")
             await page.goto(game_url)
-            
-            print("Ждем загрузки кнопки (5 сек)...")
             await page.wait_for_timeout(5000) 
 
-            print("Ищем кнопку 'PLAY NOW in BROWSER!' и кликаем...")
+            print("Ищем кнопку и кликаем...")
             try:
-                # Ищем кнопку по тексту и кликаем
-                await page.locator('text="PLAY NOW in BROWSER!"').click(timeout=10000)
-                print("Кнопка нажата! Ждем загрузки самой игры (20 секунд)...")
-                await page.wait_for_timeout(20000) # Даем время прогрузиться интерфейсу игры
+                # Ждем, пока откроется НОВАЯ вкладка после клика
+                async with context.expect_page(timeout=15000) as new_page_info:
+                    await page.locator('text="PLAY NOW in BROWSER!"').click(timeout=10000)
+                
+                # Переключаемся на новую вкладку
+                new_page = await new_page_info.value
+                print("✅ Открылась новая вкладка! Ждем загрузки игры (25 секунд)...")
+                await new_page.wait_for_timeout(25000)
+                
+                print("Делаем скриншот новой вкладки...")
+                await new_page.screenshot(path="Hamster/game_screenshot.png")
+                
             except Exception as e:
-                print(f"⚠️ Не удалось нажать кнопку (возможно, экран загрузился сразу): {e}")
+                print(f"⚠️ Новая вкладка не открылась или кнопка не найдена: {e}")
+                print("Делаем скриншот текущей страницы...")
+                await page.screenshot(path="Hamster/game_screenshot.png")
 
-            print("Делаем скриншот того, что получилось...")
-            await page.screenshot(path="Hamster/game_screenshot.png")
             print("Готово!")
-            
             await browser.close()
     except Exception as e:
         print(f"❌ Ошибка: {e}")
