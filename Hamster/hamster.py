@@ -30,18 +30,31 @@ async def main():
         ))
         game_url = web_view.url
 
-        print("Запускаем Playwright...")
+        print("Запускаем Playwright и слушаем сетевые запросы...")
         async with async_playwright() as p:
-            # Добавляем аргументы для лучшей работы графики в headless режиме
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist"]
-            )
+            browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
                 viewport={"width": 390, "height": 844},
                 user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             )
             page = await context.new_page()
+
+            # Функция, которая будет ловить все ответы от сервера
+            async def handle_response(response):
+                # Нас интересуют только JSON файлы и запросы к API
+                if response.request.resource_type in ["xhr", "fetch"]:
+                    try:
+                        text = await response.text()
+                        # Если ответ похож на данные игры (там есть баланс или здания)
+                        if "balance" in text.lower() or "coins" in text.lower() or "upgrade" in text.lower() or "user" in text.lower():
+                            print(f"\n🎯 ПЕРЕХВАЧЕН ЗАПРОС: {response.url}")
+                            print(f"Данные: {text[:1000]}...") # Выводим первые 1000 символов
+                            print("-" * 50)
+                    except:
+                        pass
+
+            # Привязываем слушатель к странице
+            page.on("response", handle_response)
 
             print("Открываем стартовый экран...")
             await page.goto(game_url)
@@ -53,25 +66,16 @@ async def main():
                     await page.locator('text="PLAY NOW in BROWSER!"').click(timeout=10000)
                 
                 new_page = await new_page_info.value
-                print("✅ Открылась новая вкладка! Ждем загрузки игры (40 секунд)...")
+                # Привязываем слушатель и к новой вкладке
+                new_page.on("response", handle_response)
                 
-                # Ждем 40 секунд, чтобы игра успела прогрузить все ассеты
+                print("✅ Открылась новая вкладка! Ждем 40 секунд, пока игра загрузит данные...")
                 await new_page.wait_for_timeout(40000)
                 
-                print(f"URL игры: {new_page.url}")
-                print(f"Заголовок страницы: {await new_page.title()}")
-                
-                print("Сохраняем скриншот и HTML-код...")
-                await new_page.screenshot(path="Hamster/game_screenshot.png")
-                
-                # Сохраняем HTML, чтобы понять, если игра не загрузилась
-                html_content = await new_page.content()
-                with open("Hamster/page_debug.html", "w", encoding="utf-8") as f:
-                    f.write(html_content)
+                print("Игра загрузилась. Проверяем, что мы перехватили выше в логах.")
                     
             except Exception as e:
                 print(f"⚠️ Ошибка: {e}")
-                await page.screenshot(path="Hamster/game_screenshot.png")
 
             print("Готово!")
             await browser.close()
