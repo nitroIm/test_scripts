@@ -1,10 +1,12 @@
-name: Hamster Recon
+name: Hamster King Auto
 
 on:
   workflow_dispatch:
+  # schedule:
+  #   - cron: '0 12 * * *' # Раз в сутки (позже раскомментируем)
 
 jobs:
-  run-hamster:
+  run-hamster-king:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -16,11 +18,11 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install git+https://github.com/LonamiWebs/Telethon.git aiohttp
+        run: |
+          pip install playwright
+          playwright install chromium
 
-      - name: Run Hamster Script
+      - name: Run Hamster King Script
         env:
-          TG_API_ID: ${{ secrets.TG_API_ID }}
-          TG_API_HASH: ${{ secrets.TG_API_HASH }}
-          TG_SESSION: ${{ secrets.TG_SESSION }}
-        run: python Hamster/hamster.py
+          TG_SESSION: ${{ secrets.TG_SESSION }} # Позже понадобится для входа
+        run: python Hamster/hamster_king.py
