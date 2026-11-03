@@ -30,33 +30,46 @@ async def main():
         ))
         game_url = web_view.url
 
-        # Вытаскиваем initData (токен)
+        # Вытаскиваем initData
         init_data = urllib.parse.unquote(game_url.split("tgWebAppData=")[1].split("&tgWebAppVersion")[0])
         
-        # Формируем правильный URL
+        # Формируем initDataUnsafe (как его видит Telegram)
+        params = dict(urllib.parse.parse_qsl(init_data))
+        init_data_unsafe = {
+            "query_id": params.get("query_id", ""),
+            "user": json.loads(params.get("user", "{}")),
+            "auth_date": params.get("auth_date", ""),
+            "hash": params.get("hash", "")
+        }
+        
         direct_url = f"https://cdn-prod-front.hwgame.cloud/app_2104.html#tgWebAppData={urllib.parse.quote(init_data)}"
 
-        print("Запускаем Playwright с подделкой Telegram.WebApp...")
+        print("Запускаем Playwright (с виртуальным экраном)...")
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=True,
+                headless=False, # Отключаем headless, будем запускать через xvfb-run
                 args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
             )
             context = await browser.new_context(
                 viewport={"width": 390, "height": 844},
-                user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+                user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+                referer="https://hamsterking.games/"
             )
 
-            # Внедряем фейковый объект Telegram, чтобы игра не редиректила
+            # Внедряем полный фейковый объект Telegram
             script = f"""
                 window.Telegram = {{
                     WebApp: {{
                         initData: "{init_data}",
-                        initDataUnsafe: {{}},
+                        initDataUnsafe: {json.dumps(init_data_unsafe)},
                         ready: function() {{}},
                         expand: function() {{}},
                         close: function() {{}},
-                        platform: "android"
+                        platform: "android",
+                        version: "9.6"
+                    }},
+                    WebView: {{
+                        initParams: {{}}
                     }}
                 }};
             """
@@ -64,19 +77,15 @@ async def main():
 
             page = await context.new_page()
 
-            # Блокируем редирект на лендинг
-            await page.route("**/hamsterking.games/**", lambda route: route.abort())
-
-            # Слушаем WebSockets
             def handle_websocket(ws):
                 print(f"\n🌐 WEBSOCKET: {ws.url}")
                 ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:300]}"))
 
             page.on("websocket", handle_websocket)
 
-            print("Загружаем игру...")
+            print("Загружаем игру по прямой ссылке...")
             await page.goto(direct_url)
-            await page.wait_for_timeout(40000)
+            await page.wait_for_timeout(45000)
 
             print(f"URL игры: {page.url}")
 
