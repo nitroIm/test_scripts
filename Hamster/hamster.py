@@ -2,15 +2,34 @@ import os
 import asyncio
 import json
 import urllib.parse
+import aiohttp
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import RequestAppWebViewRequest
 from telethon.tl.types import InputBotAppShortName
-from playwright.async_api import async_playwright
 
 api_id = int(os.environ.get("TG_API_ID"))
 api_hash = os.environ.get("TG_API_HASH")
 session_str = os.environ.get("TG_SESSION")
+
+API_BASE = "https://hk-game-api.hwgame.cloud"
+
+# Возможные эндпоинты
+ENDPOINTS = [
+    "/", "/user", "/profile", "/me", "/auth", "/login", "/init",
+    "/api/user", "/api/profile", "/api/auth", "/api/login", "/api/v1/user",
+    "/v1/user", "/v1/profile", "/game/user", "/player", "/player/info"
+]
+
+# Заголовки для авторизации (пробуем разные)
+def get_headers(init_data):
+    return [
+        {"Authorization": f"Bearer {init_data}"},
+        {"X-Telegram-Init-Data": init_data},
+        {"X-Init-Data": init_data},
+        {"init-data": init_data},
+        {"Authorization": init_data},
+    ]
 
 async def main():
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
@@ -31,97 +50,53 @@ async def main():
         game_url = web_view.url
 
         init_data = urllib.parse.unquote(game_url.split("tgWebAppData=")[1].split("&tgWebAppVersion")[0])
-        params = dict(urllib.parse.parse_qsl(init_data))
-        
-        init_data_unsafe = {
-            "query_id": params.get("query_id", ""),
-            "user": json.loads(params.get("user", "{}")),
-            "auth_date": params.get("auth_date", ""),
-            "hash": params.get("hash", "")
-        }
-        
-        direct_url = f"https://cdn-prod-front.hwgame.cloud/app_2104.html#tgWebAppData={urllib.parse.quote(init_data)}"
+        print(f"✅ Токен получен. Длина: {len(init_data)}")
+        print(f"API база: {API_BASE}")
 
-        print("Запускаем Playwright с максимальным перехватом...")
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=False,
-                args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
-            )
-            context = await browser.new_context(
-                viewport={"width": 390, "height": 844},
-                user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
-            )
+        headers_list = get_headers(init_data)
 
-            # 1. Подделываем Telegram.WebApp (чтобы игра не выкидывала)
-            script = f"""
-                window.Telegram = {{
-                    WebApp: {{
-                        initData: "{init_data}",
-                        initDataUnsafe: {json.dumps(init_data_unsafe)},
-                        ready: function() {{}},
-                        expand: function() {{}},
-                        close: function() {{}},
-                        platform: "android",
-                        version: "9.6"
-                    }}
-                }};
-            """
-            await context.add_init_script(script)
+        async with aiohttp.ClientSession() as session:
+            for endpoint in ENDPOINTS:
+                url = API_BASE + endpoint
+                for method in ["GET", "POST"]:
+                    for headers in headers_list:
+                        try:
+                            if method == "GET":
+                                async with session.get(url, headers=headers, timeout=10) as resp:
+                                    status = resp.status
+                                    if status == 200:
+                                        text = await resp.text()
+                                        print(f"\n🎯 GET {url} -> 200")
+                                        print(f"Заголовки: {list(headers.keys())}")
+                                        print(f"Данные: {text[:500]}")
+                                        return
+                                    elif status not in [404, 401, 403, 405]:
+                                        print(f"⚠️ GET {url} -> {status}")
+                            else:
+                                async with session.post(url, headers=headers, json={}, timeout=10) as resp:
+                                    status = resp.status
+                                    if status == 200:
+                                        text = await resp.text()
+                                        print(f"\n🎯 POST {url} -> 200")
+                                        print(f"Заголовки: {list(headers.keys())}")
+                                        print(f"Данные: {text[:500]}")
+                                        return
+                                    elif status not in [404, 401, 403, 405]:
+                                        print(f"⚠️ POST {url} -> {status}")
+                        except Exception as e:
+                            pass
 
-            page = await context.new_page()
-
-            # 2. Перехватываем ВСЕ запросы и ответы (XHR/Fetch)
-            intercepted = []
-
-            async def handle_response(response):
+            print("\n❌ Не удалось найти рабочий эндпоинт. Выводим все ответы для анализа...")
+            
+            # Последний шанс — стучимся в корень с разными заголовками и смотрим ответ
+            for headers in headers_list:
                 try:
-                    req = response.request
-                    if req.resource_type in ["xhr", "fetch"] or "api" in req.url.lower():
-                        text = await response.text()
-                        if len(text) > 20:
-                            entry = {"url": req.url, "status": response.status, "data": text}
-                            intercepted.append(entry)
-                            print(f"\n🎯 HTTP: {req.url}")
-                            print(f"📦 Статус: {response.status}")
-                            print(f"📄 Данные: {text[:400]}...")
+                    async with session.get(API_BASE + "/", headers=headers, timeout=10) as resp:
+                        print(f"\nGET / с {list(headers.keys())} -> {resp.status}")
+                        print(await resp.text())
                 except:
                     pass
 
-            page.on("response", handle_response)
-
-            # 3. Перехватываем WebSocket
-            def handle_websocket(ws):
-                print(f"\n🌐 WEBSOCKET: {ws.url}")
-                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:400]}"))
-                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:400]}"))
-
-            page.on("websocket", handle_websocket)
-
-            print("Загружаем игру...")
-            await page.goto(direct_url, wait_until="domcontentloaded")
-            
-            # 4. Ждем 50 секунд, чтобы всё прогрузилось и установило соединения
-            print("Ждем загрузки (50 секунд)...")
-            await page.wait_for_timeout(50000)
-
-            print(f"\nURL игры: {page.url}")
-
-            # 5. Сохраняем ВСЁ в файлы для анализа
-            print("\n💾 Сохраняем отладочные файлы...")
-            await page.screenshot(path="Hamster/game_screenshot.png")
-            
-            html = await page.content()
-            with open("Hamster/page_debug.html", "w", encoding="utf-8") as f:
-                f.write(html)
-                
-            with open("Hamster/network_log.json", "w", encoding="utf-8") as f:
-                json.dump(intercepted, f, indent=2, ensure_ascii=False)
-
-            print(f"✅ Сохранено {len(intercepted)} HTTP-запросов.")
-            print("Готово!")
-            await browser.close()
-            
     except Exception as e:
         print(f"❌ Ошибка: {e}")
     finally:
