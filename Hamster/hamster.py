@@ -14,16 +14,47 @@ session_str = os.environ.get("TG_SESSION")
 
 BOTS_TO_CHECK = ["hamster_kombat_bot", "hamsterking_game_bot"]
 
-# Расширенный список возможных эндпоинтов для HamsterVerse (Season 2)
-POSSIBLE_API_URLS = [
-    "https://api.hamsterkombat.io/clicker/sync",
-    "https://api.hamsterkombat.io/clicker/sync/",
-    "https://api.hamsterkombatgame.io/clicker/sync",
-    "https://api.hamsterkombatgame.io/clicker/sync/",
-    "https://api.hamsterkombat.io/v1/clicker/sync",
-    "https://api.hamsterkombatgame.io/v1/clicker/sync",
-    "https://api.hamsterkombat.io/api/v1/clicker/sync",
+# Расширенный список доменов и путей
+DOMAINS = [
+    "https://api.hamsterkombat.io",
+    "https://api.hamsterkombatgame.io",
+    "https://api.hamsterverse.io",
+    "https://api.hamsterking.io",
+    "https://api.hamsterkombat.com",
 ]
+
+PATHS = [
+    "/clicker/sync",
+    "/clicker/sync/",
+    "/api/v1/clicker/sync",
+    "/v1/clicker/sync",
+    "/api/clicker/sync",
+    "/clicker/sync-state",
+    "/clicker/config",
+    "/clicker/upgrades-for-buy",
+]
+
+METHODS = ["GET", "POST", "OPTIONS"]
+
+# Разные наборы заголовков
+HEADERS_SETS = {
+    "base": {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+        "Origin": "https://hamsterkombatgame.io",
+        "Referer": "https://hamsterkombatgame.io/",
+    },
+    "with_sec_ch_ua": {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+        "Origin": "https://hamsterkombatgame.io",
+        "Referer": "https://hamsterkombatgame.io/",
+        "sec-ch-ua": '"Chromium";v="114", "Google Chrome";v="114", "Not=A?Brand";v="99"',
+        "sec-ch-ua-mobile": "?1",
+        "sec-ch-ua-platform": '"Android"',
+    },
+    "minimal": {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+    }
+}
 
 async def get_init_data(client, bot_username):
     try:
@@ -47,6 +78,21 @@ async def get_init_data(client, bot_username):
         print(f"⚠️ Не удалось получить данные для {bot_username}: {e}")
         return None
 
+async def try_request(session, method, url, headers, json_data=None):
+    try:
+        if method == "GET":
+            async with session.get(url, headers=headers, timeout=5) as resp:
+                return resp.status, await resp.text()
+        elif method == "POST":
+            async with session.post(url, headers=headers, json=json_data or {}, timeout=5) as resp:
+                return resp.status, await resp.text()
+        elif method == "OPTIONS":
+            async with session.options(url, headers=headers, timeout=5) as resp:
+                return resp.status, await resp.text()
+    except Exception as e:
+        return None, str(e)
+    return None, "Unknown method"
+
 async def main():
     print("Подключаемся к Telegram...")
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
@@ -66,48 +112,41 @@ async def main():
 
         print(f"✅ Получен токен для @{bot_name}! Ищем рабочий API...")
         
-        # Добавляем заголовки, которые могут требоваться (Origin, Referer)
-        headers = {
-            "Authorization": f"Bearer {init_data}",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
-            "Origin": "https://hamsterkombatgame.io",
-            "Referer": "https://hamsterkombatgame.io/"
-        }
-        
-        found_working_url = False
         async with aiohttp.ClientSession() as session:
-            for url in POSSIBLE_API_URLS:
-                if found_working_url: break
-                
-                # Пробуем метод POST
-                try:
-                    async with session.post(url, headers=headers, json={}, timeout=5) as resp:
-                        print(f"🔍 POST {url} -> {resp.status}")
-                        if resp.status == 200:
-                            print(f"🎯 НАЙДЕН РАБОЧИЙ API (POST): {url}")
-                            data = await resp.json()
-                            print(json.dumps(data, indent=2)) # Выводим весь ответ для анализа
-                            found_working_url = True
-                            break
-                except Exception as e: 
-                    print(f"⚠️ Ошибка POST {url}: {e}")
-                
-                # Пробуем метод GET
-                try:
-                    async with session.get(url, headers=headers, timeout=5) as resp:
-                        print(f"🔍 GET {url} -> {resp.status}")
-                        if resp.status == 200:
-                            print(f"🎯 НАЙДЕН РАБОЧИЙ API (GET): {url}")
-                            data = await resp.json()
-                            print(json.dumps(data, indent=2))
-                            found_working_url = True
-                            break
-                except Exception as e: 
-                    pass
-            
-            if not found_working_url:
-                print(f"❌ Не удалось найти рабочий API для @{bot_name}.")
+            for domain in DOMAINS:
+                for path in PATHS:
+                    url = domain + path
+                    for method in METHODS:
+                        for header_name, header_data in HEADERS_SETS.items():
+                            headers = {
+                                "Authorization": f"Bearer {init_data}",
+                                "Content-Type": "application/json",
+                                **header_data
+                            }
+                            
+                            status, text = await try_request(session, method, url, headers)
+                            
+                            if status is not None:
+                                print(f"🔍 {method} {url} [{header_name}] -> {status}")
+                                if status == 200:
+                                    print(f"🎯 НАЙДЕН РАБОЧИЙ API: {method} {url}")
+                                    print(f"Headers: {header_name}")
+                                    try:
+                                        data = json.loads(text)
+                                        print(json.dumps(data, indent=2)[:1000])
+                                    except:
+                                        print(f"Response: {text[:500]}")
+                                    return # Выходим, если нашли рабочий
+                                elif status == 405:
+                                    print(f"⚠️ {url} ответил 405 (Метод не разрешен).")
+                                elif status == 404:
+                                    pass # Просто идем дальше
+                                else:
+                                    print(f"⚠️ {url} ответил {status}: {text[:100]}")
+                            else:
+                                # Если ошибка соединения, просто пропускаем
+                                pass
+        print(f"❌ Не удалось найти рабочий API для @{bot_name}.")
 
     await client.disconnect()
 
