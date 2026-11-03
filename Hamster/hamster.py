@@ -1,5 +1,6 @@
 import os
 import asyncio
+import json
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import RequestAppWebViewRequest
@@ -30,47 +31,78 @@ async def main():
         ))
         game_url = web_view.url
 
-        print("Запускаем Playwright с программной видеокартой...")
+        print("Запускаем Playwright...")
         async with async_playwright() as p:
-            # Включаем рендеринг графики для headless-режима
+            # Запускаем с флагами для рендеринга графики
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
                     "--use-gl=angle", 
                     "--use-angle=swiftshader", 
-                    "--enable-unsafe-swiftshader"
+                    "--enable-unsafe-swiftshader",
+                    "--disable-web-security"
                 ]
             )
             context = await browser.new_context(
                 viewport={"width": 390, "height": 844},
                 user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             )
-            page = await context.new_page()
-
-            print("Открываем стартовый экран...")
-            await page.goto(game_url)
             
-            # Ждем, пока сайт сам перекинет на игру (редирект)
-            print("Ждем автоматического перехода в игру...")
-            try:
-                # Ждем, пока URL не станет hamsterking.games (или пока не пройдет 20 сек)
-                await page.wait_for_url("**/hamsterking.games/**", timeout=20000)
-                print("✅ Переход выполнен! Ждем загрузки графики (25 секунд)...")
-            except:
-                print("⚠️ Автоматический переход не сработал. Пробуем нажать кнопку...")
+            # Подделываем видеокарту, чтобы игра думала, что мы на телефоне
+            await context.add_init_script("""
+                const getParameter = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                    if (parameter === 37445) return 'Qualcomm';
+                    if (parameter === 37446) return 'Adreno (TM) 660';
+                    return getParameter.apply(this, arguments);
+                };
+            """)
+
+            page = await context.new_page()
+            intercepted_data = []
+
+            # 1. Слушаем WebSockets (там летят данные игры)
+            def handle_websocket(ws):
+                print(f"\n🌐 WEBSOCKET ПОДКЛЮЧЕН: {ws.url}")
+                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:500]}"))
+                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:500]}"))
+
+            page.on("websocket", handle_websocket)
+
+            # 2. Слушаем HTTP-запросы (JSON)
+            async def handle_response(response):
                 try:
-                    await page.locator('text="PLAY NOW in BROWSER!"').click(timeout=5000)
-                    print("Кнопка нажата. Ждем 25 секунд...")
+                    if response.request.resource_type in ["xhr", "fetch"]:
+                        text = await response.text()
+                        if len(text) > 50:
+                            intercepted_data.append({"url": response.url, "data": text})
+                            if "balance" in text.lower() or "user" in text.lower():
+                                print(f"\n🎯 HTTP ЗАПРОС: {response.url}")
+                                print(f"Данные: {text[:500]}...")
                 except:
                     pass
-            
-            await page.wait_for_timeout(25000)
-            
-            print("Делаем скриншот игры с включенной графикой...")
-            await page.screenshot(path="Hamster/game_screenshot.png")
-            print("Готово!")
 
+            page.on("response", handle_response)
+
+            print("Открываем игру...")
+            await page.goto(game_url)
+            
+            print("Ждем загрузки (40 секунд)...")
+            await page.wait_for_timeout(40000)
+            
+            print(f"URL после загрузки: {page.url}")
+
+            # Сохраняем скриншот и HTML на всякий случай
+            await page.screenshot(path="Hamster/game_screenshot.png")
+            with open("Hamster/page_debug.html", "w", encoding="utf-8") as f:
+                f.write(await page.content())
+                
+            with open("Hamster/network_log.json", "w", encoding="utf-8") as f:
+                json.dump(intercepted_data, f, indent=2, ensure_ascii=False)
+
+            print("Готово!")
             await browser.close()
+            
     except Exception as e:
         print(f"❌ Ошибка: {e}")
     finally:
