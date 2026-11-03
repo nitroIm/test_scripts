@@ -7,7 +7,6 @@ api_id = int(os.environ.get("TG_API_ID"))
 api_hash = os.environ.get("TG_API_HASH")
 phone = os.environ.get("MY_PHONE")
 
-# Эти переменные появятся на втором шаге
 code = os.environ.get("TG_CODE") 
 hash_str = os.environ.get("TG_HASH") 
 temp_session = os.environ.get("TEMP_SESSION")
@@ -43,7 +42,7 @@ async def main():
         print("\n⚠️ СКОПИРУЙ ЭТУ ФИНАЛЬНУЮ СТРОКУ В СЕКРЕТ GITHUB:")
         print("Имя: TG_SESSION")
         print(f"Секрет: {client.session.save()}")
-        print("\n(Секреты TG_CODE, TG_HASH и TEMP_SESSION теперь можно удалить, они больше не нужны)")
+        print("\n(Секреты TG_CODE, TG_HASH и TEMP_SESSION теперь можно удалить)")
         print("="*50 + "\n")
     except Exception as e:
         print(f"Ошибка входа: {e}")
