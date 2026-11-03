@@ -3,6 +3,9 @@ name: Hamster Recon
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write # Разрешаем Actions сохранять файлы в репозиторий
+
 jobs:
   run-hamster:
     runs-on: ubuntu-latest
@@ -23,8 +26,10 @@ jobs:
       - name: Run Hamster Script
         run: python Hamster/hamster.py
 
-      - name: Upload Screenshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: telegram-screenshot
-          path: telegram_web.png
+      - name: Commit and push screenshot
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add Hamster/telegram_web.png || echo "No file"
+          git commit -m "Add screenshot [skip ci]" || echo "No changes to commit"
+          git push || echo "Push failed"
