@@ -30,11 +30,9 @@ async def main():
         ))
         game_url = web_view.url
 
-        # Вытаскиваем initData
         init_data = urllib.parse.unquote(game_url.split("tgWebAppData=")[1].split("&tgWebAppVersion")[0])
         params = dict(urllib.parse.parse_qsl(init_data))
         
-        # Формируем initDataUnsafe
         init_data_unsafe = {
             "query_id": params.get("query_id", ""),
             "user": json.loads(params.get("user", "{}")),
@@ -44,7 +42,7 @@ async def main():
         
         direct_url = f"https://cdn-prod-front.hwgame.cloud/app_2104.html#tgWebAppData={urllib.parse.quote(init_data)}"
 
-        print("Запускаем Playwright с обходом Telegram.WebApp...")
+        print("Запускаем Playwright с максимальным перехватом...")
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=False,
@@ -55,72 +53,72 @@ async def main():
                 user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             )
 
-            # Внедряем полный фейковый Telegram, чтобы игра не редиректила
+            # 1. Подделываем Telegram.WebApp (чтобы игра не выкидывала)
             script = f"""
                 window.Telegram = {{
                     WebApp: {{
                         initData: "{init_data}",
                         initDataUnsafe: {json.dumps(init_data_unsafe)},
-                        ready: function() {{ console.log('Telegram.WebApp.ready()'); }},
-                        expand: function() {{ console.log('Telegram.WebApp.expand()'); }},
+                        ready: function() {{}},
+                        expand: function() {{}},
                         close: function() {{}},
                         platform: "android",
-                        version: "9.6",
-                        isExpanded: true,
-                        viewportHeight: 844,
-                        viewportStableHeight: 844,
-                        headerColor: "#000000",
-                        backgroundColor: "#000000"
-                    }},
-                    WebView: {{
-                        initParams: {{}}
+                        version: "9.6"
                     }}
                 }};
-                
-                // Блокируем попытки редиректа на лендинг (только после загрузки)
-                Object.defineProperty(window, 'location', {{
-                    set: function(val) {{ console.log('Redirect blocked:', val); }},
-                    get: function() {{ return document.URL; }}
-                }});
             """
             await context.add_init_script(script)
 
             page = await context.new_page()
 
-            # Перехватываем WebSocket и HTTP
-            def handle_websocket(ws):
-                print(f"\n🌐 WEBSOCKET: {ws.url}")
-                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:500]}"))
-                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:500]}"))
-
-            page.on("websocket", handle_websocket)
+            # 2. Перехватываем ВСЕ запросы и ответы (XHR/Fetch)
+            intercepted = []
 
             async def handle_response(response):
                 try:
-                    if response.request.resource_type in ["xhr", "fetch"]:
+                    req = response.request
+                    if req.resource_type in ["xhr", "fetch"] or "api" in req.url.lower():
                         text = await response.text()
-                        if len(text) > 50:
-                            print(f"\n🎯 HTTP: {response.url}")
-                            print(f"Данные: {text[:300]}...")
+                        if len(text) > 20:
+                            entry = {"url": req.url, "status": response.status, "data": text}
+                            intercepted.append(entry)
+                            print(f"\n🎯 HTTP: {req.url}")
+                            print(f"📦 Статус: {response.status}")
+                            print(f"📄 Данные: {text[:400]}...")
                 except:
                     pass
 
             page.on("response", handle_response)
 
+            # 3. Перехватываем WebSocket
+            def handle_websocket(ws):
+                print(f"\n🌐 WEBSOCKET: {ws.url}")
+                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:400]}"))
+                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:400]}"))
+
+            page.on("websocket", handle_websocket)
+
             print("Загружаем игру...")
             await page.goto(direct_url, wait_until="domcontentloaded")
             
-            # Ждем 45 секунд, чтобы Unity прогрузился и установил соединения
-            print("Ждем загрузки игры и данных (45 секунд)...")
-            await page.wait_for_timeout(45000)
+            # 4. Ждем 50 секунд, чтобы всё прогрузилось и установило соединения
+            print("Ждем загрузки (50 секунд)...")
+            await page.wait_for_timeout(50000)
 
-            print(f"URL игры: {page.url}")
+            print(f"\nURL игры: {page.url}")
+
+            # 5. Сохраняем ВСЁ в файлы для анализа
+            print("\n💾 Сохраняем отладочные файлы...")
+            await page.screenshot(path="Hamster/game_screenshot.png")
             
-            # Сохраняем HTML для отладки
             html = await page.content()
             with open("Hamster/page_debug.html", "w", encoding="utf-8") as f:
                 f.write(html)
                 
+            with open("Hamster/network_log.json", "w", encoding="utf-8") as f:
+                json.dump(intercepted, f, indent=2, ensure_ascii=False)
+
+            print(f"✅ Сохранено {len(intercepted)} HTTP-запросов.")
             print("Готово!")
             await browser.close()
             
