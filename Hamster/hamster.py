@@ -20,7 +20,7 @@ async def main():
         await page.wait_for_timeout(10000) 
 
         print("Делаем скриншот...")
-        await page.screenshot(path="telegram_web.png")
+        await page.screenshot(path="Hamster/telegram_web.png")
         
         print("Готово.")
         await browser.close()
