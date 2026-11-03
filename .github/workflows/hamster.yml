@@ -1,12 +1,10 @@
-name: Hamster King Auto
+name: Hamster Recon
 
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: '0 12 * * *' # Раз в сутки (позже раскомментируем)
 
 jobs:
-  run-hamster-king:
+  run-hamster:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -22,7 +20,11 @@ jobs:
           pip install playwright
           playwright install chromium
 
-      - name: Run Hamster King Script
-        env:
-          TG_SESSION: ${{ secrets.TG_SESSION }} # Позже понадобится для входа
-        run: python Hamster/hamster_king.py
+      - name: Run Hamster Script
+        run: python Hamster/hamster.py
+
+      - name: Upload Screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-screenshot
+          path: telegram_web.png
