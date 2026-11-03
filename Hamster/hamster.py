@@ -33,22 +33,15 @@ async def main():
 
         print("Запускаем Playwright...")
         async with async_playwright() as p:
-            # Запускаем с флагами для рендеринга графики
             browser = await p.chromium.launch(
                 headless=True,
-                args=[
-                    "--use-gl=angle", 
-                    "--use-angle=swiftshader", 
-                    "--enable-unsafe-swiftshader",
-                    "--disable-web-security"
-                ]
+                args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
             )
             context = await browser.new_context(
                 viewport={"width": 390, "height": 844},
                 user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             )
             
-            # Подделываем видеокарту, чтобы игра думала, что мы на телефоне
             await context.add_init_script("""
                 const getParameter = WebGLRenderingContext.prototype.getParameter;
                 WebGLRenderingContext.prototype.getParameter = function(parameter) {
@@ -59,48 +52,32 @@ async def main():
             """)
 
             page = await context.new_page()
-            intercepted_data = []
 
-            # 1. Слушаем WebSockets (там летят данные игры)
+            # --- СЛУШАЕМ WEBSOCKETS ---
             def handle_websocket(ws):
                 print(f"\n🌐 WEBSOCKET ПОДКЛЮЧЕН: {ws.url}")
-                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:500]}"))
-                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:500]}"))
+                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:300]}"))
+                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:300]}"))
 
             page.on("websocket", handle_websocket)
-
-            # 2. Слушаем HTTP-запросы (JSON)
-            async def handle_response(response):
-                try:
-                    if response.request.resource_type in ["xhr", "fetch"]:
-                        text = await response.text()
-                        if len(text) > 50:
-                            intercepted_data.append({"url": response.url, "data": text})
-                            if "balance" in text.lower() or "user" in text.lower():
-                                print(f"\n🎯 HTTP ЗАПРОС: {response.url}")
-                                print(f"Данные: {text[:500]}...")
-                except:
-                    pass
-
-            page.on("response", handle_response)
 
             print("Открываем игру...")
             await page.goto(game_url)
             
-            print("Ждем загрузки (40 секунд)...")
-            await page.wait_for_timeout(40000)
+            print("Ждем загрузки WebSockets и графики (45 секунд)...")
+            await page.wait_for_timeout(45000)
             
             print(f"URL после загрузки: {page.url}")
 
-            # Сохраняем скриншот и HTML на всякий случай
-            await page.screenshot(path="Hamster/game_screenshot.png")
-            with open("Hamster/page_debug.html", "w", encoding="utf-8") as f:
-                f.write(await page.content())
-                
-            with open("Hamster/network_log.json", "w", encoding="utf-8") as f:
-                json.dump(intercepted_data, f, indent=2, ensure_ascii=False)
+            # --- ВЫТАСКИВАЕМ LOCALSTORAGE (ТАМ МОГУТ БЫТЬ ДАННЫЕ) ---
+            print("\n🔍 ИЗВЛЕКАЕМ ДАННЫЕ ИЗ ПАМЯТИ БРАУЗЕРА (localStorage)...")
+            try:
+                local_storage = await page.evaluate("JSON.stringify(localStorage)")
+                print(f"LocalStorage: {local_storage}")
+            except Exception as e:
+                print(f"Ошибка чтения localStorage: {e}")
 
-            print("Готово!")
+            print("\nГотово!")
             await browser.close()
             
     except Exception as e:
