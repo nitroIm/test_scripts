@@ -32,9 +32,9 @@ async def main():
 
         # Вытаскиваем initData
         init_data = urllib.parse.unquote(game_url.split("tgWebAppData=")[1].split("&tgWebAppVersion")[0])
-        
-        # Формируем initDataUnsafe (как его видит Telegram)
         params = dict(urllib.parse.parse_qsl(init_data))
+        
+        # Формируем правильный initDataUnsafe
         init_data_unsafe = {
             "query_id": params.get("query_id", ""),
             "user": json.loads(params.get("user", "{}")),
@@ -44,19 +44,21 @@ async def main():
         
         direct_url = f"https://cdn-prod-front.hwgame.cloud/app_2104.html#tgWebAppData={urllib.parse.quote(init_data)}"
 
-        print("Запускаем Playwright (с виртуальным экраном)...")
+        print("Запускаем Playwright...")
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=False, # Отключаем headless, будем запускать через xvfb-run
+                headless=False, # Обязательно False для xvfb
                 args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
             )
+            
+            # ИСПРАВЛЕНО: используем extra_http_headers вместо referer
             context = await browser.new_context(
                 viewport={"width": 390, "height": 844},
                 user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
-                referer="https://hamsterking.games/"
+                extra_http_headers={"Referer": "https://hamsterking.games/"}
             )
 
-            # Внедряем полный фейковый объект Telegram
+            # Внедряем фейковый Telegram
             script = f"""
                 window.Telegram = {{
                     WebApp: {{
@@ -67,9 +69,6 @@ async def main():
                         close: function() {{}},
                         platform: "android",
                         version: "9.6"
-                    }},
-                    WebView: {{
-                        initParams: {{}}
                     }}
                 }};
             """
@@ -77,25 +76,23 @@ async def main():
 
             page = await context.new_page()
 
+            # Слушаем WebSockets
             def handle_websocket(ws):
-                print(f"\n🌐 WEBSOCKET: {ws.url}")
+                print(f"\n🌐 WEBSOCKET ПОДКЛЮЧЕН: {ws.url}")
                 ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:300]}"))
+                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:300]}"))
 
             page.on("websocket", handle_websocket)
 
-            print("Загружаем игру по прямой ссылке...")
-            await page.goto(direct_url)
-            await page.wait_for_timeout(45000)
+            print("Загружаем игру...")
+            await page.goto(direct_url, wait_until="domcontentloaded")
+            
+            # Ждем 50 секунд, чтобы Unity успел прогрузить все ресурсы и установить соединения
+            print("Ждем загрузки игры и данных (50 секунд)...")
+            await page.wait_for_timeout(50000)
 
             print(f"URL игры: {page.url}")
-
-            print("\n🔍 Проверяем IndexedDB...")
-            try:
-                dbs = await page.evaluate("indexedDB.databases()")
-                print(f"Базы данных: {dbs}")
-            except Exception as e:
-                print(f"Ошибка: {e}")
-
+            print("Готово!")
             await browser.close()
             
     except Exception as e:
