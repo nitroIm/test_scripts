@@ -14,19 +14,25 @@ session_str = os.environ["TG_SESSION"]
 
 BASE_API = "https://hk-game-api.hwgame.cloud"
 
-# Список самых вероятных эндпоинтов авторизации в играх Telegram Mini Apps
+# Все известные эндпоинты авторизации из Telegram Mini Apps
 ENDPOINTS = [
     "/auth",
-    "/login",
-    "/auth/login",
-    "/api/auth",
-    "/api/v1/auth",
-    "/user/auth",
-    "/telegram/auth",
     "/auth/telegram",
+    "/auth/auth-by-telegram-webapp",
+    "/auth/me-telegram",
+    "/api/auth",
+    "/api/auth/telegram",
+    "/api/v1/auth",
+    "/api/v1/auth/telegram",
+    "/login",
+    "/login/telegram",
+    "/telegram/login",
+    "/user/auth",
     "/user/login",
-    "/me"
 ]
+
+# Все варианты полей, куда игра может ждать initData
+BODY_FIELDS = ["initData", "init_data", "initDataRaw", "tgWebAppData", "data", "query"]
 
 async def get_initdata():
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
@@ -44,77 +50,89 @@ async def get_initdata():
     await client.disconnect()
     return init_data
 
-def test_auth(init_data):
-    print("[*] Начинаем тестирование эндпоинтов авторизации...")
-    
-    # Варианты заголовков
-    headers_list = [
-        {
-            "Content-Type": "application/json", 
-            "Authorization": f"Bearer {init_data}"
-        },
-        {
-            "Content-Type": "application/json", 
-            "X-Telegram-Init-Data": init_data
-        },
-        {
-            "Content-Type": "application/json", 
-            "X-Init-Data": init_data
-        },
-        {
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-    ]
+def try_auth(init_data):
+    print(f"[*] initData length: {len(init_data)}")
+    print("[*] Начинаем полный перебор комбинаций...\n")
 
-    # Варианты тела запроса
-    bodies = [
-        {"initData": init_data},
-        {"init_data": init_data},
-        {"tgWebAppData": init_data},
-        f"initData={urllib.parse.quote(init_data)}", # Для form-data
-        f"init_data={urllib.parse.quote(init_data)}"
+    # Заголовки
+    headers_list = [
+        {"Content-Type": "application/json"},
+        {"Content-Type": "application/json", "X-Telegram-Init-Data": init_data},
+        {"Content-Type": "application/json", "Authorization": f"Bearer {init_data}"},
+        {"Content-Type": "application/x-www-form-urlencoded"},
     ]
 
     for endpoint in ENDPOINTS:
         url = BASE_API + endpoint
-        print(f"\n[?] Проверяем: {url}")
-        
-        for headers in headers_list:
-            for body in bodies:
+        print(f"[?] Проверяем: {url}")
+
+        # 1. POST с JSON и разными полями
+        for field in BODY_FIELDS:
+            body = {field: init_data}
+            for headers in headers_list:
+                if "x-www-form-urlencoded" in headers.get("Content-Type", ""):
+                    continue
                 try:
-                    # Если передаем строку, используем data=, иначе json=
-                    if isinstance(body, str):
-                        resp = requests.post(url, headers=headers, data=body, timeout=5)
-                    else:
-                        resp = requests.post(url, headers=headers, json=body, timeout=5)
-                    
-                    # 404 значит, что такого пути нет. Нас интересуют 200, 400, 401, 403, 422
-                    if resp.status_code != 404:
-                        print(f"  🎯 НАЙДЕН ОТВЕТ! Код: {resp.status_code}")
+                    resp = requests.post(url, json=body, headers=headers, timeout=5)
+                    if resp.status_code not in (404, 405):
+                        print(f"  🎯 POST {endpoint} -> {resp.status_code}")
                         print(f"     Headers: {list(headers.keys())}")
-                        print(f"     Body: {str(body)[:100]}")
+                        print(f"     Body field: {field}")
                         print(f"     Response: {resp.text[:300]}")
-                        
-                        # Если 200 OK, значит мы авторизовались
                         if resp.status_code == 200:
-                            print("\n[!!!] УСПЕХ! Мы получили токен или данные пользователя.")
-                            return True
+                            return resp
                 except Exception:
                     pass
-        print(f"  ❌ Все варианты для {endpoint} дали 404.")
 
-    return False
+        # 2. POST с form-data
+        for field in BODY_FIELDS:
+            data = {field: init_data}
+            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            try:
+                resp = requests.post(url, data=data, headers=headers, timeout=5)
+                if resp.status_code not in (404, 405):
+                    print(f"  🎯 POST (form) {endpoint} -> {resp.status_code}")
+                    print(f"     Body field: {field}")
+                    print(f"     Response: {resp.text[:300]}")
+                    if resp.status_code == 200:
+                        return resp
+            except Exception:
+                pass
+
+        # 3. GET с заголовками
+        for headers in headers_list:
+            if "x-www-form-urlencoded" in headers.get("Content-Type", ""):
+                continue
+            try:
+                resp = requests.get(url, headers=headers, timeout=5)
+                if resp.status_code not in (404, 405):
+                    print(f"  🎯 GET {endpoint} -> {resp.status_code}")
+                    print(f"     Headers: {list(headers.keys())}")
+                    print(f"     Response: {resp.text[:300]}")
+                    if resp.status_code == 200:
+                        return resp
+            except Exception:
+                pass
+
+        print(f"  ❌ {endpoint} — все варианты дали 404/405.\n")
+
+    return None
 
 async def main():
     print("[*] Получаем initData...")
     init_data = await get_initdata()
     print(f"[+] initData len: {len(init_data)}")
-    
-    success = test_auth(init_data)
-    
-    if not success:
-        print("\n[!] Не удалось найти эндпоинт. Возможно, игра использует WebSocket для авторизации.")
-        print("[!] Тогда нам нужно вернуться к перехвату WebSocket.")
+    print(f"[+] initData head: {init_data[:80]}...\n")
+
+    result = try_auth(init_data)
+
+    if result:
+        print("\n[!!!] УСПЕХ! Сервер ответил.")
+        print(f"Статус: {result.status_code}")
+        print(f"Тело ответа: {result.text[:1000]}")
+    else:
+        print("\n[!] Ни одна комбинация не сработала.")
+        print("[!] Возможно, игра использует WebSocket или требует fingerprint.")
 
 if __name__ == "__main__":
     import asyncio
