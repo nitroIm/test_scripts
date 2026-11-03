@@ -24,12 +24,13 @@ jobs:
       - name: Install Playwright Chromium
         run: playwright install --with-deps chromium
 
-      - name: Run Hamster Script
+      - name: Run Hamster Script (xvfb)
         env:
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}
-        run: python Hamster/hamster.py
+        # Запускаем через виртуальный дисплей
+        run: xvfb-run --auto-servernum python Hamster/hamster.py
 
       - name: Upload logs
         if: always()
@@ -39,4 +40,5 @@ jobs:
           path: |
             requests.log
             ws.log
+            responses.log
           if-no-files-found: warn
