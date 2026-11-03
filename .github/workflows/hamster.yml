@@ -15,8 +15,8 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: pip install telethon
+      - name: Install latest Telethon from GitHub
+        run: pip install git+https://github.com/LonamiWebs/Telethon.git
 
       - name: Run Hamster Script
         env:
