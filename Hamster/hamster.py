@@ -3,6 +3,7 @@ import os
 import json
 import urllib.parse
 import requests
+import hashlib
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import RequestAppWebViewRequest
@@ -14,25 +15,11 @@ session_str = os.environ["TG_SESSION"]
 
 BASE_API = "https://hk-game-api.hwgame.cloud"
 
-# Все известные эндпоинты авторизации из Telegram Mini Apps
+# Эндпоинты, которые могут использоваться для входа
 ENDPOINTS = [
-    "/auth",
-    "/auth/telegram",
     "/auth/auth-by-telegram-webapp",
     "/auth/me-telegram",
-    "/api/auth",
-    "/api/auth/telegram",
-    "/api/v1/auth",
-    "/api/v1/auth/telegram",
-    "/login",
-    "/login/telegram",
-    "/telegram/login",
-    "/user/auth",
-    "/user/login",
 ]
-
-# Все варианты полей, куда игра может ждать initData
-BODY_FIELDS = ["initData", "init_data", "initDataRaw", "tgWebAppData", "data", "query"]
 
 async def get_initdata():
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
@@ -50,71 +37,52 @@ async def get_initdata():
     await client.disconnect()
     return init_data
 
+def generate_fingerprint():
+    """
+    Генерирует псевдо-fingerprint, имитируя поведение браузера.
+    В реальности это хеш от комбинации User-Agent, разрешения экрана и т.д.
+    Для теста используем простой хеш.
+    """
+    # Простой хеш от строки (для демонстрации)
+    # В реальной игре fingerprint может быть сложнее.
+    raw = "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36|412x915|24"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
 def try_auth(init_data):
     print(f"[*] initData length: {len(init_data)}")
-    print("[*] Начинаем полный перебор комбинаций...\n")
+    fingerprint = generate_fingerprint()
+    print(f"[*] Сгенерирован fingerprint: {fingerprint[:16]}...")
 
-    # Заголовки
-    headers_list = [
-        {"Content-Type": "application/json"},
-        {"Content-Type": "application/json", "X-Telegram-Init-Data": init_data},
-        {"Content-Type": "application/json", "Authorization": f"Bearer {init_data}"},
-        {"Content-Type": "application/x-www-form-urlencoded"},
-    ]
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "Accept": "application/json",
+        "Origin": "https://hamsterking.games",
+        "Referer": "https://hamsterking.games/"
+    }
 
     for endpoint in ENDPOINTS:
         url = BASE_API + endpoint
-        print(f"[?] Проверяем: {url}")
+        print(f"\n[?] Проверяем: {url}")
 
-        # 1. POST с JSON и разными полями
-        for field in BODY_FIELDS:
-            body = {field: init_data}
-            for headers in headers_list:
-                if "x-www-form-urlencoded" in headers.get("Content-Type", ""):
-                    continue
-                try:
-                    resp = requests.post(url, json=body, headers=headers, timeout=5)
-                    if resp.status_code not in (404, 405):
-                        print(f"  🎯 POST {endpoint} -> {resp.status_code}")
-                        print(f"     Headers: {list(headers.keys())}")
-                        print(f"     Body field: {field}")
-                        print(f"     Response: {resp.text[:300]}")
-                        if resp.status_code == 200:
-                            return resp
-                except Exception:
-                    pass
+        # Варианты тела запроса с fingerprint
+        bodies = [
+            {"initData": init_data, "fingerprint": fingerprint},
+            {"initData": init_data, "fingerprint": fingerprint, "hash": fingerprint},
+            {"initData": init_data, "fingerprint": fingerprint, "user": json.loads(urllib.parse.unquote(init_data.split('user=')[1].split('&')[0]))},
+        ]
 
-        # 2. POST с form-data
-        for field in BODY_FIELDS:
-            data = {field: init_data}
-            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        for body in bodies:
             try:
-                resp = requests.post(url, data=data, headers=headers, timeout=5)
-                if resp.status_code not in (404, 405):
-                    print(f"  🎯 POST (form) {endpoint} -> {resp.status_code}")
-                    print(f"     Body field: {field}")
-                    print(f"     Response: {resp.text[:300]}")
-                    if resp.status_code == 200:
-                        return resp
-            except Exception:
-                pass
-
-        # 3. GET с заголовками
-        for headers in headers_list:
-            if "x-www-form-urlencoded" in headers.get("Content-Type", ""):
-                continue
-            try:
-                resp = requests.get(url, headers=headers, timeout=5)
-                if resp.status_code not in (404, 405):
-                    print(f"  🎯 GET {endpoint} -> {resp.status_code}")
-                    print(f"     Headers: {list(headers.keys())}")
-                    print(f"     Response: {resp.text[:300]}")
-                    if resp.status_code == 200:
-                        return resp
-            except Exception:
-                pass
-
-        print(f"  ❌ {endpoint} — все варианты дали 404/405.\n")
+                resp = requests.post(url, json=body, headers=headers, timeout=10)
+                print(f"  -> POST {endpoint} с fingerprint -> {resp.status_code}")
+                if resp.status_code == 200:
+                    print(f"  🎯 УСПЕХ! Ответ: {resp.text[:500]}")
+                    return resp
+                elif resp.status_code not in (404, 405):
+                    print(f"     Ответ сервера: {resp.text[:200]}")
+            except Exception as e:
+                print(f"  [!] Ошибка: {e}")
 
     return None
 
@@ -127,12 +95,12 @@ async def main():
     result = try_auth(init_data)
 
     if result:
-        print("\n[!!!] УСПЕХ! Сервер ответил.")
+        print("\n[!!!] УСПЕХ! Сервер принял аутентификацию.")
         print(f"Статус: {result.status_code}")
         print(f"Тело ответа: {result.text[:1000]}")
     else:
-        print("\n[!] Ни одна комбинация не сработала.")
-        print("[!] Возможно, игра использует WebSocket или требует fingerprint.")
+        print("\n[!] Ни один эндпоинт с fingerprint не сработал.")
+        print("[!] Возможно, игра использует другой метод или требует реальный отпечаток браузера.")
 
 if __name__ == "__main__":
     import asyncio
