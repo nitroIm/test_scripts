@@ -34,7 +34,7 @@ async def main():
         init_data = urllib.parse.unquote(game_url.split("tgWebAppData=")[1].split("&tgWebAppVersion")[0])
         params = dict(urllib.parse.parse_qsl(init_data))
         
-        # Формируем правильный initDataUnsafe
+        # Формируем initDataUnsafe
         init_data_unsafe = {
             "query_id": params.get("query_id", ""),
             "user": json.loads(params.get("user", "{}")),
@@ -44,54 +44,83 @@ async def main():
         
         direct_url = f"https://cdn-prod-front.hwgame.cloud/app_2104.html#tgWebAppData={urllib.parse.quote(init_data)}"
 
-        print("Запускаем Playwright...")
+        print("Запускаем Playwright с обходом Telegram.WebApp...")
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=False, # Обязательно False для xvfb
+                headless=False,
                 args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
             )
-            
-            # ИСПРАВЛЕНО: используем extra_http_headers вместо referer
             context = await browser.new_context(
                 viewport={"width": 390, "height": 844},
-                user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
-                extra_http_headers={"Referer": "https://hamsterking.games/"}
+                user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             )
 
-            # Внедряем фейковый Telegram
+            # Внедряем полный фейковый Telegram, чтобы игра не редиректила
             script = f"""
                 window.Telegram = {{
                     WebApp: {{
                         initData: "{init_data}",
                         initDataUnsafe: {json.dumps(init_data_unsafe)},
-                        ready: function() {{}},
-                        expand: function() {{}},
+                        ready: function() {{ console.log('Telegram.WebApp.ready()'); }},
+                        expand: function() {{ console.log('Telegram.WebApp.expand()'); }},
                         close: function() {{}},
                         platform: "android",
-                        version: "9.6"
+                        version: "9.6",
+                        isExpanded: true,
+                        viewportHeight: 844,
+                        viewportStableHeight: 844,
+                        headerColor: "#000000",
+                        backgroundColor: "#000000"
+                    }},
+                    WebView: {{
+                        initParams: {{}}
                     }}
                 }};
+                
+                // Блокируем попытки редиректа на лендинг (только после загрузки)
+                Object.defineProperty(window, 'location', {{
+                    set: function(val) {{ console.log('Redirect blocked:', val); }},
+                    get: function() {{ return document.URL; }}
+                }});
             """
             await context.add_init_script(script)
 
             page = await context.new_page()
 
-            # Слушаем WebSockets
+            # Перехватываем WebSocket и HTTP
             def handle_websocket(ws):
-                print(f"\n🌐 WEBSOCKET ПОДКЛЮЧЕН: {ws.url}")
-                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:300]}"))
-                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:300]}"))
+                print(f"\n🌐 WEBSOCKET: {ws.url}")
+                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:500]}"))
+                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:500]}"))
 
             page.on("websocket", handle_websocket)
+
+            async def handle_response(response):
+                try:
+                    if response.request.resource_type in ["xhr", "fetch"]:
+                        text = await response.text()
+                        if len(text) > 50:
+                            print(f"\n🎯 HTTP: {response.url}")
+                            print(f"Данные: {text[:300]}...")
+                except:
+                    pass
+
+            page.on("response", handle_response)
 
             print("Загружаем игру...")
             await page.goto(direct_url, wait_until="domcontentloaded")
             
-            # Ждем 50 секунд, чтобы Unity успел прогрузить все ресурсы и установить соединения
-            print("Ждем загрузки игры и данных (50 секунд)...")
-            await page.wait_for_timeout(50000)
+            # Ждем 45 секунд, чтобы Unity прогрузился и установил соединения
+            print("Ждем загрузки игры и данных (45 секунд)...")
+            await page.wait_for_timeout(45000)
 
             print(f"URL игры: {page.url}")
+            
+            # Сохраняем HTML для отладки
+            html = await page.content()
+            with open("Hamster/page_debug.html", "w", encoding="utf-8") as f:
+                f.write(html)
+                
             print("Готово!")
             await browser.close()
             
