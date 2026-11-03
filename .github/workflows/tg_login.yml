@@ -21,9 +21,5 @@ jobs:
         env:
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
-          MY_PHONE: ${{ secrets.MY_PHONE }}
-          TG_CODE: ${{ secrets.TG_CODE }}
-          TG_HASH: ${{ secrets.TG_HASH }}
-          TEMP_SESSION: ${{ secrets.TEMP_SESSION }}
-          TG_2FA_PASSWORD: ${{ secrets.TG_2FA_PASSWORD }}
+          TG_SESSION: ${{ secrets.TG_SESSION }}
         run: python scripts/tg_login.py
