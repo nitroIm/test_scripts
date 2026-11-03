@@ -18,8 +18,11 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: pip install telethon aiohttp
+      - name: Install Python dependencies
+        run: pip install -r Hamster/requirements.txt
+
+      - name: Install Playwright Chromium
+        run: playwright install --with-deps chromium
 
       - name: Run Hamster Script
         env:
@@ -27,3 +30,13 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}
         run: python Hamster/hamster.py
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamster-logs
+          path: |
+            requests.log
+            ws.log
+          if-no-files-found: warn
