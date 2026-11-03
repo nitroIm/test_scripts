@@ -3,9 +3,6 @@ name: Hamster Recon
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   run-hamster:
     runs-on: ubuntu-latest
@@ -29,11 +26,3 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}
         run: python Hamster/hamster.py
-
-      - name: Commit and push screenshot and debug
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add Hamster/game_screenshot.png Hamster/page_debug.html || echo "No files"
-          git commit -m "Add game screenshot and debug html [skip ci]" || echo "No changes to commit"
-          git push || echo "Push failed"
