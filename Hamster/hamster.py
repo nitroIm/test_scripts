@@ -1,19 +1,23 @@
 # Hamster/hamster.py
 import os
 import re
-import urllib.parse
 import requests
+import urllib.parse
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import RequestAppWebViewRequest
 from telethon.tl.types import InputBotAppShortName
-from bs4 import BeautifulSoup
 
 api_id = int(os.environ["TG_API_ID"])
 api_hash = os.environ["TG_API_HASH"]
 session_str = os.environ["TG_SESSION"]
 
-BASE_HTML = "https://cdn-prod-front.hwgame.cloud/app_2104.html"
+# Скачиваем карту маршрутов и главные JS-файлы
+TARGET_FILES = [
+    "https://prod-route.hwgame.cloud/routes.json",
+    "https://cdn-prod-front-dist.hwgame.cloud/assets/app_2104.js",
+    "https://cdn-prod-front-dist.hwgame.cloud/assets/deps-DN0_KosA.js",
+]
 
 async def get_initdata():
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
@@ -31,86 +35,53 @@ async def get_initdata():
     await client.disconnect()
     return init_data
 
-def analyze_all_js():
-    print("[*] Скачиваем HTML игры...")
+def analyze_files():
     headers = {"User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36"}
-    resp = requests.get(BASE_HTML, headers=headers, timeout=15)
-    resp.raise_for_status()
     
-    soup = BeautifulSoup(resp.text, 'html.parser')
-    scripts = soup.find_all('script')
-    
-    js_urls = set()
-    for s in scripts:
-        src = s.get('src')
-        if src:
-            if src.startswith('http'):
-                js_urls.add(src)
-            elif src.startswith('/'):
-                js_urls.add("https://cdn-prod-front.hwgame.cloud" + src)
-            else:
-                js_urls.add("https://cdn-prod-front.hwgame.cloud/" + src)
-                
-    # Добавляем те, что видели в логах
-    js_urls.add("https://cdn-prod-front-dist.hwgame.cloud/assets/app_2104.js")
-    js_urls.add("https://cdn-prod-front-dist.hwgame.cloud/assets/deps-DN0_KosA.js")
-    js_urls.add("https://cdn-prod-front.hwgame.cloud/assets/telegram-web-app.8.0-hotfix.js")
-
-    print(f"[*] Найдено {len(js_urls)} JS файлов. Начинаем анализ...")
-    
-    found_endpoints = set()
-    
-    for url in js_urls:
-        filename = url.split('/')[-1]
+    for url in TARGET_FILES:
+        print(f"\n==========================================")
+        print(f"[*] Скачиваем: {url.split('/')[-1]}")
+        print(f"==========================================")
         try:
-            r = requests.get(url, headers=headers, timeout=10)
+            r = requests.get(url, headers=headers, timeout=15)
             if r.status_code != 200:
+                print(f"[!] Ошибка HTTP {r.status_code}")
                 continue
             text = r.text
+            print(f"[+] Размер: {len(text)} символов")
+
+            # Если это routes.json - просто выводим его
+            if url.endswith(".json"):
+                print("\n=== СОДЕРЖИМОЕ routes.json ===")
+                print(text)
+                continue
+
+            # Ищем строки с ключевыми словами API
+            lines = re.findall(r'["\']([^"\']{4,100})["\']', text)
+            keywords = ["auth", "login", "token", "hwgame", "telegram", "user", "mini"]
+            found = set()
             
-            # Ищем все URL-ы, начинающиеся с http или /
-            # Паттерн ищет строки в кавычках, где есть http или слэш
-            matches = re.findall(r'["\'](https?://[^"\']+|/[a-zA-Z0-9_\-/]+)["\']', text)
+            for line in lines:
+                if any(kw in line.lower() for kw in keywords):
+                    # Отсеиваем мусор (длинные строки с пробелами и CSS-классы)
+                    if " " not in line and not line.startswith("#"):
+                        found.add(line)
             
-            for m in matches:
-                # Отфильтровываем картинки, шрифты и прочий мусор
-                if any(m.endswith(ext) for ext in ['.png', '.jpg', '.svg', '.woff2', '.css', '.js']):
-                    continue
-                # Оставляем только то, что похоже на API
-                if any(kw in m.lower() for kw in ['auth', 'login', 'api', 'tg', 'telegram', 'user']):
-                    found_endpoints.add((filename, m))
-                    
+            print(f"\n[+] Найдено {len(found)} подозрительных строк:")
+            for line in sorted(found):
+                print(f"  -> {line}")
+                
         except Exception as e:
-            print(f"  [!] Ошибка {filename}: {e}")
-
-    print("\n=== НАЙДЕННЫЕ ПУТИ В JS ===")
-    for fname, ep in sorted(found_endpoints):
-        print(f"  [{fname}] {ep}")
-
-    print("\n[*] Пробуем постучаться в найденные эндпоинты на hk-game-api...")
-    test_endpoints = set()
-    for fname, ep in found_endpoints:
-        if ep.startswith('http'):
-            if 'hwgame' in ep:
-                test_endpoints.add(ep)
-        else:
-            test_endpoints.add("https://hk-game-api.hwgame.cloud" + ep)
-
-    for url in test_endpoints:
-        try:
-            r = requests.get(url, headers=headers, timeout=5)
-            if r.status_code != 404:
-                print(f"  🎯 GET {url} -> {r.status_code}")
-                print(f"     {r.text[:200]}")
-        except Exception:
-            pass
+            print(f"[!] Ошибка: {e}")
 
 async def main():
     print("[*] Получаем initData...")
     init_data = await get_initdata()
     print(f"[+] initData len: {len(init_data)}")
-    analyze_all_js()
-    print("\n[!] Готово.")
+    
+    print("\n[*] Анализируем файлы...")
+    analyze_files()
+    print("\n[!] Анализ завершен.")
 
 if __name__ == "__main__":
     import asyncio
