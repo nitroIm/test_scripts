@@ -36,7 +36,7 @@ async def get_game_url_and_initdata():
 async def intercept(game_url: str, init_data: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(
-            headless=False,  # Обязательно False, запускаем под xvfb
+            headless=False,  # Запускаем под xvfb для обхода детекта headless
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
@@ -58,13 +58,10 @@ async def intercept(game_url: str, init_data: str):
         )
         page = await context.new_page()
 
-        # Максимальная маскировка
+        # Максимальная маскировка для обхода детекта Telegram.WebApp
         await page.add_init_script(f"""
             (() => {{
-                // Прячем webdriver
                 Object.defineProperty(navigator, 'webdriver', {{ get: () => undefined }});
-                
-                // Подменяем UserAgentData
                 const originalUserAgentData = navigator.userAgentData;
                 if (originalUserAgentData) {{
                     Object.defineProperty(navigator, 'userAgentData', {{
@@ -79,57 +76,54 @@ async def intercept(game_url: str, init_data: str):
                         }})
                     }});
                 }}
-
-                // Telegram WebApp
                 const initData = `{init_data}`;
                 const params = new URLSearchParams(initData);
                 const userStr = params.get('user');
                 let user = {{}};
                 try {{ user = userStr ? JSON.parse(decodeURIComponent(userStr)) : {{}}; }} catch(e) {{}}
-                
-                const wa = {{
-                    initData: initData,
-                    initDataUnsafe: {{
-                        query_id: params.get('query_id') || '',
-                        user: user,
-                        auth_date: params.get('auth_date') || '',
-                        hash: params.get('hash') || '',
+                window.Telegram = {{
+                    WebApp: {{
+                        initData: initData,
+                        initDataUnsafe: {{
+                            query_id: params.get('query_id') || '',
+                            user: user,
+                            auth_date: params.get('auth_date') || '',
+                            hash: params.get('hash') || '',
+                            platform: "android",
+                        }},
                         platform: "android",
-                    }},
-                    platform: "android",
-                    version: "9.6",
-                    colorScheme: "dark",
-                    themeParams: {{}},
-                    isExpanded: true,
-                    viewportHeight: 915,
-                    viewportStableHeight: 915,
-                    ready: () => {{ console.log('[TG] ready()'); }},
-                    expand: () => {{ console.log('[TG] expand()'); }},
-                    close: () => {{}},
-                    sendData: (d) => console.log('[sendData]', d),
-                    openLink: (u) => console.log('[openLink]', u),
-                    openTelegramLink: (u) => console.log('[openTelegramLink]', u),
-                    showAlert: (m) => console.log('[showAlert]', m),
-                    showConfirm: (m, cb) => cb && cb(true),
-                    onEvent: () => {{}},
-                    offEvent: () => {{}},
-                    isVersionAtLeast: (v) => true,
-                    HapticFeedback: {{
-                        impactOccurred: () => {{}},
-                        notificationOccurred: () => {{}},
-                        selectionChanged: () => {{}},
-                    }},
-                    MainButton: {{
-                        text: "", isVisible: false, show: () => {{}}, hide: () => {{}},
-                        onClick: () => {{}}, offClick: () => {{}}, setText: () => {{}},
-                    }},
-                    BackButton: {{
-                        isVisible: false, show: () => {{}}, hide: () => {{}},
-                        onClick: () => {{}}, offClick: () => {{}},
-                    }},
+                        version: "9.6",
+                        colorScheme: "dark",
+                        themeParams: {{}},
+                        isExpanded: true,
+                        viewportHeight: 915,
+                        viewportStableHeight: 915,
+                        ready: () => {{ console.log('[TG] ready()'); }},
+                        expand: () => {{ console.log('[TG] expand()'); }},
+                        close: () => {{}},
+                        sendData: (d) => console.log('[sendData]', d),
+                        openLink: (u) => console.log('[openLink]', u),
+                        openTelegramLink: (u) => console.log('[openTelegramLink]', u),
+                        showAlert: (m) => console.log('[showAlert]', m),
+                        showConfirm: (m, cb) => cb && cb(true),
+                        onEvent: () => {{}},
+                        offEvent: () => {{}},
+                        isVersionAtLeast: (v) => true,
+                        HapticFeedback: {{
+                            impactOccurred: () => {{}},
+                            notificationOccurred: () => {{}},
+                            selectionChanged: () => {{}},
+                        }},
+                        MainButton: {{
+                            text: "", isVisible: false, show: () => {{}}, hide: () => {{}},
+                            onClick: () => {{}}, offClick: () => {{}}, setText: () => {{}},
+                        }},
+                        BackButton: {{
+                            isVisible: false, show: () => {{}}, hide: () => {{}},
+                            onClick: () => {{}}, offClick: () => {{}},
+                        }},
+                    }}
                 }};
-                window.Telegram = {{ WebApp: wa }};
-                
                 window.TelegramWebviewProxy = {{
                     postEvent: (type, data) => console.log('[TelegramWebviewProxy]', type, data)
                 }};
@@ -158,7 +152,7 @@ async def intercept(game_url: str, init_data: str):
         async def on_response(resp):
             try:
                 url = resp.url
-                # Сохраняем ответы от API hwgame
+                # Сохраняем ответы от API hwgame (кроме статики)
                 if "hwgame" in url and "cdn-prod" not in url:
                     text = ""
                     try:
@@ -217,7 +211,7 @@ async def intercept(game_url: str, init_data: str):
         print(f"[*] Финальный URL: {page.url}")
         await browser.close()
 
-    # Сохраняем логи
+    # Сохраняем логи в файлы
     with open("requests.log", "w", encoding="utf-8") as f:
         json.dump(LOG_REQUESTS, f, ensure_ascii=False, indent=2)
     with open("responses.log", "w", encoding="utf-8") as f:
