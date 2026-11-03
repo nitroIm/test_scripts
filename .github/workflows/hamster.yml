@@ -20,6 +20,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
           pip install playwright telethon
           playwright install chromium
 
@@ -28,7 +30,7 @@ jobs:
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}
-        run: python Hamster/hamster.py
+        run: xvfb-run --auto-servernum python Hamster/hamster.py
 
       - name: Commit debug files
         run: |
