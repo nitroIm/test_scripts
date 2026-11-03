@@ -35,7 +35,7 @@ async def main():
         ))
         
         game_url = web_view.url
-        print(f"✅ Получена ссылка на игру: {game_url[:60]}...")
+        print(f"✅ Получена ссылка на игру.")
 
         print("Запускаем Playwright...")
         async with async_playwright() as p:
@@ -46,13 +46,22 @@ async def main():
             )
             page = await context.new_page()
 
-            print("Открываем игру напрямую...")
+            print("Открываем стартовый экран...")
             await page.goto(game_url)
             
-            print("Ждем загрузки игры (15 секунд)...")
-            await page.wait_for_timeout(15000) 
+            print("Ждем загрузки кнопки (5 сек)...")
+            await page.wait_for_timeout(5000) 
 
-            print("Делаем скриншот игры...")
+            print("Ищем кнопку 'PLAY NOW in BROWSER!' и кликаем...")
+            try:
+                # Ищем кнопку по тексту и кликаем
+                await page.locator('text="PLAY NOW in BROWSER!"').click(timeout=10000)
+                print("Кнопка нажата! Ждем загрузки самой игры (20 секунд)...")
+                await page.wait_for_timeout(20000) # Даем время прогрузиться интерфейсу игры
+            except Exception as e:
+                print(f"⚠️ Не удалось нажать кнопку (возможно, экран загрузился сразу): {e}")
+
+            print("Делаем скриншот того, что получилось...")
             await page.screenshot(path="Hamster/game_screenshot.png")
             print("Готово!")
             
