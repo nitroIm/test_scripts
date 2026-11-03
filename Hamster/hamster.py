@@ -14,11 +14,15 @@ session_str = os.environ.get("TG_SESSION")
 
 BOTS_TO_CHECK = ["hamster_kombat_bot", "hamsterking_game_bot"]
 
-# Оставляем только те адреса, которые не дали 404, и добавляем варианты
+# Расширенный список возможных эндпоинтов для HamsterVerse (Season 2)
 POSSIBLE_API_URLS = [
     "https://api.hamsterkombat.io/clicker/sync",
+    "https://api.hamsterkombat.io/clicker/sync/",
     "https://api.hamsterkombatgame.io/clicker/sync",
-    "https://api.hamsterkombat.io/api/clicker/sync"
+    "https://api.hamsterkombatgame.io/clicker/sync/",
+    "https://api.hamsterkombat.io/v1/clicker/sync",
+    "https://api.hamsterkombatgame.io/v1/clicker/sync",
+    "https://api.hamsterkombat.io/api/v1/clicker/sync",
 ]
 
 async def get_init_data(client, bot_username):
@@ -62,10 +66,13 @@ async def main():
 
         print(f"✅ Получен токен для @{bot_name}! Ищем рабочий API...")
         
+        # Добавляем заголовки, которые могут требоваться (Origin, Referer)
         headers = {
             "Authorization": f"Bearer {init_data}",
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+            "Origin": "https://hamsterkombatgame.io",
+            "Referer": "https://hamsterkombatgame.io/"
         }
         
         found_working_url = False
@@ -76,31 +83,31 @@ async def main():
                 # Пробуем метод POST
                 try:
                     async with session.post(url, headers=headers, json={}, timeout=5) as resp:
+                        print(f"🔍 POST {url} -> {resp.status}")
                         if resp.status == 200:
                             print(f"🎯 НАЙДЕН РАБОЧИЙ API (POST): {url}")
                             data = await resp.json()
-                            balance = data.get("clickerUser", {}).get("balanceCoins", "Н/Д")
-                            print(f"💰 Баланс: {balance}")
+                            print(json.dumps(data, indent=2)) # Выводим весь ответ для анализа
                             found_working_url = True
                             break
-                except Exception: pass
+                except Exception as e: 
+                    print(f"⚠️ Ошибка POST {url}: {e}")
                 
                 # Пробуем метод GET
                 try:
                     async with session.get(url, headers=headers, timeout=5) as resp:
+                        print(f"🔍 GET {url} -> {resp.status}")
                         if resp.status == 200:
                             print(f"🎯 НАЙДЕН РАБОЧИЙ API (GET): {url}")
                             data = await resp.json()
-                            balance = data.get("clickerUser", {}).get("balanceCoins", "Н/Д")
-                            print(f"💰 Баланс: {balance}")
+                            print(json.dumps(data, indent=2))
                             found_working_url = True
                             break
-                        elif resp.status == 405:
-                            print(f"⚠️ {url} ответил 405 (Метод не разрешен). Пробуем другие методы/пути...")
-                except Exception: pass
+                except Exception as e: 
+                    pass
             
             if not found_working_url:
-                print(f"❌ Не удалось найти рабочий API для @{bot_name}. Все адреса вернули ошибку.")
+                print(f"❌ Не удалось найти рабочий API для @{bot_name}.")
 
     await client.disconnect()
 
