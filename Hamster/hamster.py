@@ -30,8 +30,19 @@ async def main():
             peer=input_user, app=app, platform="android", write_allowed=True
         ))
         game_url = web_view.url
+        print(f"Ссылка от Telegram: {game_url[:80]}...")
 
-        print("Запускаем Playwright...")
+        # Извлекаем hash с токеном (tgWebAppData=...)
+        if "#tgWebAppData=" in game_url:
+            hash_part = game_url.split("#")[1]
+            # Формируем ПРЯМУЮ ссылку на игру
+            direct_url = f"https://cdn-prod-front.hwgame.cloud/app_2104.html#{hash_part}"
+        else:
+            print("❌ Токен не найден в ссылке.")
+            return
+
+        print(f"Открываем прямой URL: {direct_url[:80]}...")
+
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
@@ -42,40 +53,31 @@ async def main():
                 user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             )
             
-            await context.add_init_script("""
-                const getParameter = WebGLRenderingContext.prototype.getParameter;
-                WebGLRenderingContext.prototype.getParameter = function(parameter) {
-                    if (parameter === 37445) return 'Qualcomm';
-                    if (parameter === 37446) return 'Adreno (TM) 660';
-                    return getParameter.apply(this, arguments);
-                };
-            """)
-
             page = await context.new_page()
 
-            # --- СЛУШАЕМ WEBSOCKETS ---
+            # Слушаем WebSockets (там 100% будут данные игры)
             def handle_websocket(ws):
-                print(f"\n🌐 WEBSOCKET ПОДКЛЮЧЕН: {ws.url}")
-                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:300]}"))
-                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:300]}"))
+                print(f"\n🌐 WEBSOCKET: {ws.url}")
+                ws.on("framereceived", lambda payload: print(f"⬇️ ПОЛУЧЕНО: {str(payload)[:500]}"))
+                ws.on("framesent", lambda payload: print(f"⬆️ ОТПРАВЛЕНО: {str(payload)[:500]}"))
 
             page.on("websocket", handle_websocket)
 
-            print("Открываем игру...")
-            await page.goto(game_url)
+            print("Загружаем игру...")
+            await page.goto(direct_url)
             
-            print("Ждем загрузки WebSockets и графики (45 секунд)...")
-            await page.wait_for_timeout(45000)
+            print("Ждем загрузки и обмена данными (40 секунд)...")
+            await page.wait_for_timeout(40000)
             
-            print(f"URL после загрузки: {page.url}")
+            print(f"URL игры: {page.url}")
 
-            # --- ВЫТАСКИВАЕМ LOCALSTORAGE (ТАМ МОГУТ БЫТЬ ДАННЫЕ) ---
-            print("\n🔍 ИЗВЛЕКАЕМ ДАННЫЕ ИЗ ПАМЯТИ БРАУЗЕРА (localStorage)...")
+            # Вытаскиваем IndexedDB (там Unity хранит сохранения)
+            print("\n🔍 Пытаемся вытащить данные из IndexedDB...")
             try:
-                local_storage = await page.evaluate("JSON.stringify(localStorage)")
-                print(f"LocalStorage: {local_storage}")
+                dbs = await page.evaluate("indexedDB.databases()")
+                print(f"Найдено баз данных: {dbs}")
             except Exception as e:
-                print(f"Ошибка чтения localStorage: {e}")
+                print(f"Ошибка IndexedDB: {e}")
 
             print("\nГотово!")
             await browser.close()
