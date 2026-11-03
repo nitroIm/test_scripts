@@ -1,8 +1,8 @@
 # Hamster/hamster.py
 import os
-import re
-import requests
+import json
 import urllib.parse
+import requests
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import RequestAppWebViewRequest
@@ -12,11 +12,20 @@ api_id = int(os.environ["TG_API_ID"])
 api_hash = os.environ["TG_API_HASH"]
 session_str = os.environ["TG_SESSION"]
 
-# Скачиваем карту маршрутов и главные JS-файлы
-TARGET_FILES = [
-    "https://prod-route.hwgame.cloud/routes.json",
-    "https://cdn-prod-front-dist.hwgame.cloud/assets/app_2104.js",
-    "https://cdn-prod-front-dist.hwgame.cloud/assets/deps-DN0_KosA.js",
+BASE_API = "https://hk-game-api.hwgame.cloud"
+
+# Список самых вероятных эндпоинтов авторизации в играх Telegram Mini Apps
+ENDPOINTS = [
+    "/auth",
+    "/login",
+    "/auth/login",
+    "/api/auth",
+    "/api/v1/auth",
+    "/user/auth",
+    "/telegram/auth",
+    "/auth/telegram",
+    "/user/login",
+    "/me"
 ]
 
 async def get_initdata():
@@ -35,53 +44,77 @@ async def get_initdata():
     await client.disconnect()
     return init_data
 
-def analyze_files():
-    headers = {"User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36"}
+def test_auth(init_data):
+    print("[*] Начинаем тестирование эндпоинтов авторизации...")
     
-    for url in TARGET_FILES:
-        print(f"\n==========================================")
-        print(f"[*] Скачиваем: {url.split('/')[-1]}")
-        print(f"==========================================")
-        try:
-            r = requests.get(url, headers=headers, timeout=15)
-            if r.status_code != 200:
-                print(f"[!] Ошибка HTTP {r.status_code}")
-                continue
-            text = r.text
-            print(f"[+] Размер: {len(text)} символов")
+    # Варианты заголовков
+    headers_list = [
+        {
+            "Content-Type": "application/json", 
+            "Authorization": f"Bearer {init_data}"
+        },
+        {
+            "Content-Type": "application/json", 
+            "X-Telegram-Init-Data": init_data
+        },
+        {
+            "Content-Type": "application/json", 
+            "X-Init-Data": init_data
+        },
+        {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+    ]
 
-            # Если это routes.json - просто выводим его
-            if url.endswith(".json"):
-                print("\n=== СОДЕРЖИМОЕ routes.json ===")
-                print(text)
-                continue
+    # Варианты тела запроса
+    bodies = [
+        {"initData": init_data},
+        {"init_data": init_data},
+        {"tgWebAppData": init_data},
+        f"initData={urllib.parse.quote(init_data)}", # Для form-data
+        f"init_data={urllib.parse.quote(init_data)}"
+    ]
 
-            # Ищем строки с ключевыми словами API
-            lines = re.findall(r'["\']([^"\']{4,100})["\']', text)
-            keywords = ["auth", "login", "token", "hwgame", "telegram", "user", "mini"]
-            found = set()
-            
-            for line in lines:
-                if any(kw in line.lower() for kw in keywords):
-                    # Отсеиваем мусор (длинные строки с пробелами и CSS-классы)
-                    if " " not in line and not line.startswith("#"):
-                        found.add(line)
-            
-            print(f"\n[+] Найдено {len(found)} подозрительных строк:")
-            for line in sorted(found):
-                print(f"  -> {line}")
-                
-        except Exception as e:
-            print(f"[!] Ошибка: {e}")
+    for endpoint in ENDPOINTS:
+        url = BASE_API + endpoint
+        print(f"\n[?] Проверяем: {url}")
+        
+        for headers in headers_list:
+            for body in bodies:
+                try:
+                    # Если передаем строку, используем data=, иначе json=
+                    if isinstance(body, str):
+                        resp = requests.post(url, headers=headers, data=body, timeout=5)
+                    else:
+                        resp = requests.post(url, headers=headers, json=body, timeout=5)
+                    
+                    # 404 значит, что такого пути нет. Нас интересуют 200, 400, 401, 403, 422
+                    if resp.status_code != 404:
+                        print(f"  🎯 НАЙДЕН ОТВЕТ! Код: {resp.status_code}")
+                        print(f"     Headers: {list(headers.keys())}")
+                        print(f"     Body: {str(body)[:100]}")
+                        print(f"     Response: {resp.text[:300]}")
+                        
+                        # Если 200 OK, значит мы авторизовались
+                        if resp.status_code == 200:
+                            print("\n[!!!] УСПЕХ! Мы получили токен или данные пользователя.")
+                            return True
+                except Exception:
+                    pass
+        print(f"  ❌ Все варианты для {endpoint} дали 404.")
+
+    return False
 
 async def main():
     print("[*] Получаем initData...")
     init_data = await get_initdata()
     print(f"[+] initData len: {len(init_data)}")
     
-    print("\n[*] Анализируем файлы...")
-    analyze_files()
-    print("\n[!] Анализ завершен.")
+    success = test_auth(init_data)
+    
+    if not success:
+        print("\n[!] Не удалось найти эндпоинт. Возможно, игра использует WebSocket для авторизации.")
+        print("[!] Тогда нам нужно вернуться к перехвату WebSocket.")
 
 if __name__ == "__main__":
     import asyncio
