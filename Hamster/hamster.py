@@ -12,11 +12,15 @@ api_id = int(os.environ.get("TG_API_ID"))
 api_hash = os.environ.get("TG_API_HASH")
 session_str = os.environ.get("TG_SESSION")
 
-# Список ботов для проверки
-BOTS_TO_CHECK = [
-    "hamster_kombat_bot",       # Основной бот (для GameDev Heroes)
-    "hamsterking_game_bot",     # Бот для Hamster King (возможное имя)
-    "hamster_king_bot"          # Альтернативное имя
+BOTS_TO_CHECK = ["hamster_kombat_bot", "hamsterking_game_bot"]
+
+# Список возможных новых адресов API для проверки
+POSSIBLE_API_URLS = [
+    "https://api.hamsterkombatgame.io/clicker/sync",
+    "https://api.hamsterkombat.io/clicker/sync",
+    "https://api.hamsterverse.io/clicker/sync",
+    "https://api.hamsterkombatgame.io/hamsterverse/clicker/sync",
+    "https://api.hamsterking.io/clicker/sync"
 ]
 
 async def get_init_data(client, bot_username):
@@ -50,38 +54,43 @@ async def main():
         print("❌ Сессия не авторизована.")
         return
 
-    # Проходим по всем ботам из списка
     for bot_name in BOTS_TO_CHECK:
         print(f"\n🔍 Проверяем бота: @{bot_name}...")
         init_data = await get_init_data(client, bot_name)
         
-        if init_data:
-            print(f"✅ Получен токен для @{bot_name}!")
-            
-            # Пробуем синхронизироваться с API Hamster Kombat
-            # (В HamsterVerse API часто общий, но пути могут отличаться)
-            headers = {
-                "Authorization": f"Bearer {init_data}",
-                "Content-Type": "application/json"
-            }
-            
-            async with aiohttp.ClientSession() as session:
-                # Пробуем эндпоинт Hamster King (предположительный)
-                # Если он не работает, мы увидим ошибку и сможем поискать другой путь
-                url = "https://api.hamsterkombatgame.io/clicker/sync"
-                if "king" in bot_name:
-                     # Для Hamster King может быть другой эндпоинт, но начнем с базового
-                     pass 
-                
-                async with session.post(url, headers=headers, json={}) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        balance = data.get("clickerUser", {}).get("balanceCoins", 0)
-                        print(f"💰 Баланс: {balance}")
-                    else:
-                        print(f"❌ Ошибка API (Код {resp.status}): {await resp.text()}")
-        else:
+        if not init_data:
             print(f"❌ Токен для @{bot_name} не получен.")
+            continue
+
+        print(f"✅ Получен токен для @{bot_name}! Ищем рабочий API...")
+        
+        headers = {
+            "Authorization": f"Bearer {init_data}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+        }
+        
+        found_working_url = False
+        async with aiohttp.ClientSession() as session:
+            for url in POSSIBLE_API_URLS:
+                try:
+                    async with session.post(url, headers=headers, json={}, timeout=5) as resp:
+                        if resp.status == 200:
+                            print(f"🎯 НАЙДЕН РАБОЧИЙ API: {url}")
+                            data = await resp.json()
+                            balance = data.get("clickerUser", {}).get("balanceCoins", "Н/Д")
+                            print(f"💰 Баланс: {balance}")
+                            found_working_url = True
+                            break # Если нашли рабочий, дальше не проверяем
+                        elif resp.status == 404:
+                            pass # Просто идем к следующему
+                        else:
+                            print(f"⚠️ {url} ответил кодом {resp.status}")
+                except Exception:
+                    pass
+            
+            if not found_working_url:
+                print(f"❌ Не удалось найти рабочий API для @{bot_name}. Все адреса вернули ошибку.")
 
     await client.disconnect()
 
