@@ -22,29 +22,29 @@ async def main():
 
     print("✅ Авторизован. Открываем Hamster Kombat...")
     try:
-        # Получаем сущность бота
         bot = await client.get_entity("hamster_kombat_bot")
-        # Получаем input_entity для надежности
-        peer = await client.get_input_entity(bot)
-        
-        # Открываем мини-приложение
-        app = InputBotAppShortName(bot_id=bot.id, short_name="start")
+        # ВАЖНО: получаем именно InputUser, а не просто id
+        input_user = await client.get_input_entity(bot)
+
+        # Передаём input_user в bot_id
+        app = InputBotAppShortName(bot_id=input_user, short_name="start")
+
         web_view = await client(RequestAppWebViewRequest(
-            peer=peer,
+            peer=input_user,  # можно использовать input_user
             app=app,
             platform="android",
             write_allowed=True
         ))
-        
+
         url = web_view.url
-        
+
         if "tgWebAppData=" in url:
             init_data = url.split("tgWebAppData=")[1].split("&tgWebAppVersion")[0]
             decoded_data = urllib.parse.unquote(init_data)
-            
+
             print("\n" + "="*50)
             print("🎉 РАЗВЕДКА УСПЕШНА! Данные получены.")
-            
+
             try:
                 params = dict(urllib.parse.parse_qsl(decoded_data))
                 if 'user' in params:
@@ -57,7 +57,7 @@ async def main():
             print("\n⚠️ ТОКЕН ПОЛУЧЕН (нужен для тапов):")
             print(f"INIT_DATA: {init_data[:50]}...")
             print("="*50 + "\n")
-            
+
         else:
             print("❌ Не удалось найти tgWebAppData в ссылке.")
 
