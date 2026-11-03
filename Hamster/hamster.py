@@ -32,7 +32,11 @@ async def main():
 
         print("Запускаем Playwright...")
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            # Добавляем аргументы для лучшей работы графики в headless режиме
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist"]
+            )
             context = await browser.new_context(
                 viewport={"width": 390, "height": 844},
                 user_agent="Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
@@ -45,21 +49,28 @@ async def main():
 
             print("Ищем кнопку и кликаем...")
             try:
-                # Ждем, пока откроется НОВАЯ вкладка после клика
                 async with context.expect_page(timeout=15000) as new_page_info:
                     await page.locator('text="PLAY NOW in BROWSER!"').click(timeout=10000)
                 
-                # Переключаемся на новую вкладку
                 new_page = await new_page_info.value
-                print("✅ Открылась новая вкладка! Ждем загрузки игры (25 секунд)...")
-                await new_page.wait_for_timeout(25000)
+                print("✅ Открылась новая вкладка! Ждем загрузки игры (40 секунд)...")
                 
-                print("Делаем скриншот новой вкладки...")
+                # Ждем 40 секунд, чтобы игра успела прогрузить все ассеты
+                await new_page.wait_for_timeout(40000)
+                
+                print(f"URL игры: {new_page.url}")
+                print(f"Заголовок страницы: {await new_page.title()}")
+                
+                print("Сохраняем скриншот и HTML-код...")
                 await new_page.screenshot(path="Hamster/game_screenshot.png")
                 
+                # Сохраняем HTML, чтобы понять, если игра не загрузилась
+                html_content = await new_page.content()
+                with open("Hamster/page_debug.html", "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                    
             except Exception as e:
-                print(f"⚠️ Новая вкладка не открылась или кнопка не найдена: {e}")
-                print("Делаем скриншот текущей страницы...")
+                print(f"⚠️ Ошибка: {e}")
                 await page.screenshot(path="Hamster/game_screenshot.png")
 
             print("Готово!")
