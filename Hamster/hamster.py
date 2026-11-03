@@ -14,6 +14,7 @@ api_hash = os.environ["TG_API_HASH"]
 session_str = os.environ["TG_SESSION"]
 
 LOG_REQUESTS = []
+LOG_RESPONSES = []
 LOG_WS = []
 
 
@@ -36,11 +37,16 @@ async def get_game_url_and_initdata():
 
 async def intercept(game_url: str, init_data: str):
     async with async_playwright() as p:
+        # Запускаем в видимом режиме (под xvfb в GitHub Actions), 
+        # чтобы не палиться на HeadlessChrome
         browser = await p.chromium.launch(
-            headless=True,
+            headless=False, 
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--enable-unsafe-swiftshader", # Для WebGL
+                "--use-gl=swiftshader",
             ],
         )
         context = await browser.new_context(
@@ -55,14 +61,36 @@ async def intercept(game_url: str, init_data: str):
         )
         page = await context.new_page()
 
-        # Подсовываем Telegram.WebApp ДО загрузки скриптов игры
+        # Маскировка Headless + Telegram.WebApp
         await page.add_init_script(f"""
             (() => {{
+                // 1. Прячем webdriver
+                Object.defineProperty(navigator, 'webdriver', {{ get: () => undefined }});
+                
+                // 2. Подменяем платформу в UserAgentData
+                const originalUserAgentData = navigator.userAgentData;
+                if (originalUserAgentData) {{
+                    Object.defineProperty(navigator, 'userAgentData', {{
+                        get: () => ({{
+                            ...originalUserAgentData,
+                            brands: [
+                                {{ brand: "Chromium", version: "124" }},
+                                {{ brand: "Google Chrome", version: "124" }},
+                                {{ brand: "Not-A.Brand", version: "99" }}
+                            ],
+                            mobile: true,
+                            platform: "Android"
+                        }})
+                    }});
+                }}
+
+                // 3. Telegram WebApp
                 const initData = `{init_data}`;
                 const params = new URLSearchParams(initData);
                 const userStr = params.get('user');
                 let user = {{}};
                 try {{ user = userStr ? JSON.parse(decodeURIComponent(userStr)) : {{}}; }} catch(e) {{}}
+                
                 const wa = {{
                     initData: initData,
                     initDataUnsafe: {{
@@ -71,16 +99,15 @@ async def intercept(game_url: str, init_data: str):
                         auth_date: params.get('auth_date') || '',
                         hash: params.get('hash') || '',
                         platform: "android",
+                        start_param: ""
                     }},
                     platform: "android",
-                    version: "7.0",
+                    version: "9.6",
                     colorScheme: "dark",
                     themeParams: {{}},
                     isExpanded: true,
                     viewportHeight: 915,
                     viewportStableHeight: 915,
-                    headerColor: "#000000",
-                    backgroundColor: "#000000",
                     ready: () => {{}},
                     expand: () => {{}},
                     close: () => {{}},
@@ -91,38 +118,35 @@ async def intercept(game_url: str, init_data: str):
                     showConfirm: (m, cb) => cb && cb(true),
                     onEvent: () => {{}},
                     offEvent: () => {{}},
+                    isVersionAtLeast: (v) => true,
                     HapticFeedback: {{
                         impactOccurred: () => {{}},
                         notificationOccurred: () => {{}},
                         selectionChanged: () => {{}},
                     }},
                     MainButton: {{
-                        text: "",
-                        isVisible: false,
-                        show: () => {{}},
-                        hide: () => {{}},
-                        onClick: () => {{}},
-                        offClick: () => {{}},
-                        setText: () => {{}},
+                        text: "", isVisible: false, show: () => {{}}, hide: () => {{}},
+                        onClick: () => {{}}, offClick: () => {{}}, setText: () => {{}},
                     }},
                     BackButton: {{
-                        isVisible: false,
-                        show: () => {{}},
-                        hide: () => {{}},
-                        onClick: () => {{}},
-                        offClick: () => {{}},
+                        isVisible: false, show: () => {{}}, hide: () => {{}},
+                        onClick: () => {{}}, offClick: () => {{}},
                     }},
                 }};
                 window.Telegram = {{ WebApp: wa }};
+                
+                // Прокси для общения с "нативным" Telegram
                 window.TelegramWebviewProxy = {{
                     postEvent: (type, data) => {{
                         console.log('[TelegramWebviewProxy]', type, data);
+                        // Эмуляция ответа от нативного клиента, если игра этого ждёт
+                        if (type === "web_app_request_theme") {{
+                             window.TelegramGameProxy_receiveEvent(JSON.stringify({{ eventType: "theme_changed", eventData: {{ theme_params: {{}} }} }}));
+                        }}
                     }}
                 }};
                 window.TelegramGameProxy = {{
-                    receiveEvent: (data) => {{
-                        console.log('[TelegramGameProxy]', data);
-                    }}
+                    receiveEvent: (data) => console.log('[TelegramGameProxy]', data)
                 }};
                 window.TelegramGameProxy_receiveEvent = (data) => {{
                     console.log('[TelegramGameProxy_receiveEvent]', data);
@@ -141,8 +165,24 @@ async def intercept(game_url: str, init_data: str):
                 if req.post_data:
                     entry["post_data"] = req.post_data
                 LOG_REQUESTS.append(entry)
-            except Exception as e:
-                print(f"[req-err] {e}")
+            except Exception:
+                pass
+
+        async def on_response(resp):
+            try:
+                url = resp.url
+                if "hwgame" in url and "loading_data" in url:
+                    print(f"[RESPONSE] {resp.status} {url}")
+                    headers = dict(resp.headers)
+                    print(f"  resp_headers: {headers}")
+                    try:
+                        text = await resp.text()
+                        print(f"  body[:500]: {text[:500]}")
+                        LOG_RESPONSES.append({"url": url, "status": resp.status, "headers": headers, "body": text})
+                    except Exception as e:
+                        print(f"  body error: {e}")
+            except Exception:
+                pass
 
         def on_ws(ws):
             ws_entry = {"url": ws.url, "frames": []}
@@ -155,16 +195,24 @@ async def intercept(game_url: str, init_data: str):
             ))
 
         page.on("request", on_request)
+        page.on("response", lambda r: asyncio.create_task(on_response(r)))
         page.on("websocket", on_ws)
-        page.on("console", lambda m: print(f"[console] {m.type}: {m.text[:300]}") if m.type in ("error", "warning") else None)
+
+        def on_console(m):
+            if m.type in ("error", "warning"):
+                print(f"[console] {m.type}: {m.text[:300]}")
+
+        page.on("console", on_console)
 
         print(f"[*] goto: {game_url[:200]}")
         try:
-            await page.goto(game_url, wait_until="domcontentloaded", timeout=60000)
+            # wait_until="load" ждёт полной загрузки, включая Unity
+            await page.goto(game_url, wait_until="load", timeout=60000)
         except Exception as e:
             print(f"[!] goto failed: {e}")
-        # даём игре время на инициализацию + WS
-        await asyncio.sleep(30)
+
+        # Ждём, пока Unity прогрузится и игра попытается подключиться
+        await asyncio.sleep(40)
 
         print(f"[*] final_url: {page.url}")
         try:
@@ -175,14 +223,16 @@ async def intercept(game_url: str, init_data: str):
 
         await browser.close()
 
-    # Сохраняем логи
     with open("requests.log", "w", encoding="utf-8") as f:
         json.dump(LOG_REQUESTS, f, ensure_ascii=False, indent=2)
     with open("ws.log", "w", encoding="utf-8") as f:
         json.dump(LOG_WS, f, ensure_ascii=False, indent=2)
+    with open("responses.log", "w", encoding="utf-8") as f:
+        json.dump(LOG_RESPONSES, f, ensure_ascii=False, indent=2)
 
     print(f"[+] total requests: {len(LOG_REQUESTS)}")
     print(f"[+] total websockets: {len(LOG_WS)}")
+    print(f"[+] total captured responses: {len(LOG_RESPONSES)}")
 
     print("\n=== Интересные HTTP запросы (hwgame / api / game) ===")
     for r in LOG_REQUESTS:
@@ -208,7 +258,6 @@ async def intercept(game_url: str, init_data: str):
 async def main():
     game_url, init_data = await get_game_url_and_initdata()
     print(f"[+] initData len: {len(init_data)}")
-    print(f"[+] initData head: {init_data[:120]}...")
     await intercept(game_url, init_data)
 
 
