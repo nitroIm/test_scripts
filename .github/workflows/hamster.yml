@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # Разрешаем Actions сохранять файлы в репозиторий
+  contents: write
 
 jobs:
   run-hamster:
@@ -20,16 +20,20 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install playwright
+          pip install playwright telethon
           playwright install chromium
 
       - name: Run Hamster Script
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION: ${{ secrets.TG_SESSION }}
         run: python Hamster/hamster.py
 
       - name: Commit and push screenshot
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add Hamster/telegram_web.png || echo "No file"
-          git commit -m "Add screenshot [skip ci]" || echo "No changes to commit"
+          git add Hamster/game_screenshot.png || echo "No file"
+          git commit -m "Add game screenshot [skip ci]" || echo "No changes to commit"
           git push || echo "Push failed"
