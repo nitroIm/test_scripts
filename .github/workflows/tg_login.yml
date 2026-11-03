@@ -25,4 +25,5 @@ jobs:
           TG_CODE: ${{ secrets.TG_CODE }}
           TG_HASH: ${{ secrets.TG_HASH }}
           TEMP_SESSION: ${{ secrets.TEMP_SESSION }}
+          TG_2FA_PASSWORD: ${{ secrets.TG_2FA_PASSWORD }}
         run: python scripts/tg_login.py
