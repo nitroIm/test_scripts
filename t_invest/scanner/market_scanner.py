@@ -7,8 +7,8 @@ import json
 from datetime import timedelta, datetime, timezone
 
 from t_tech.invest import Client
-from t_tech.invest.constants import INVEST_GRPC_API  # Боевой контур (PROD)
-from t_tech.invest.schemas import CandleInterval, SecurityTradingStatus, InstrumentStatus
+from t_tech.invest.constants import INVEST_GRPC_API
+from t_tech.invest.schemas import CandleInterval, InstrumentStatus
 from t_tech.invest.utils import now
 
 TOKEN = os.environ.get("T_INVEST_TOKEN")
@@ -16,13 +16,7 @@ TOKEN = os.environ.get("T_INVEST_TOKEN")
 # === НАСТРОЙКИ ФИЛЬТРОВ ===
 MIN_DAILY_TURNOVER_RUB = 50_000_000  # 50 млн рублей
 MAX_SPREAD_PERCENT = 0.5             # 0.5%
-CANDLES_DAYS = 10                    # сколько дней истории брать для анализа
-
-# Оставили только те статусы, которые точно есть в версии 1.49.3
-ALLOWED_STATUSES = {
-    SecurityTradingStatus.SECURITY_TRADING_STATUS_NORMAL_TRADING,
-    SecurityTradingStatus.SECURITY_TRADING_STATUS_CLOSING_AUCTION,
-}
+CANDLES_DAYS = 10                    # дней истории для анализа
 
 def quotation_to_float(q):
     if q is None:
@@ -131,12 +125,13 @@ def main():
     if os.path.exists(output_path):
         try:
             with open(output_path, "r", encoding="utf-8") as f:
-                old_list = json.load(f)
-                old_data = {item["ticker"]: item for item in old_list}
+                content = f.read()
+                if content:
+                    old_list = json.loads(content)
+                    old_data = {item["ticker"]: item for item in old_list}
         except Exception as e:
             print(f"⚠️ Не удалось прочитать старый whitelist: {e}")
 
-    # Явно указываем target=INVEST_GRPC_API (PROD)
     with Client(TOKEN, target=INVEST_GRPC_API) as client:
         shares_resp = client.instruments.shares(
             instrument_status=InstrumentStatus.INSTRUMENT_STATUS_ALL
@@ -144,22 +139,12 @@ def main():
         shares = shares_resp.instruments
         print(f"Всего акций получено: {len(shares)}")
 
-        figis = [s.figi for s in shares]
-        status_map = {}
-        for i in range(0, len(figis), 100):
-            batch = figis[i:i+100]
-            try:
-                statuses = client.instruments.get_trading_statuses(instrument_ids=batch)
-                for st in statuses.trading_statuses:
-                    status_map[st.figi] = st.trading_status
-            except Exception as e:
-                print(f"⚠️ Ошибка статусов для батча {i}: {e}")
-
         results = []
         skipped = 0
+        
         for share in shares:
-            status = status_map.get(share.figi)
-            if status not in ALLOWED_STATUSES:
+            # Проверяем только флаги, которые гарантированно работают в API
+            if not share.buy_available_flag or not share.sell_available_flag:
                 skipped += 1
                 continue
 
