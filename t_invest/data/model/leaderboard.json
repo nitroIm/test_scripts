@@ -1,0 +1,15 @@
+{
+  "winner": "model_lgbm",
+  "profit_factor": 0.7267809730855952,
+  "all_results": {
+    "model_logreg": 0.0500360794524261,
+    "model_catboost": 0.3742949543310414,
+    "model_rf": 0.7046915846915414,
+    "model_custom": 0.04739832814735381,
+    "model_lgbm": 0.7267809730855952,
+    "model_xgb": 0.5788177977748682
+  },
+  "trained_at": "2026-11-07T20:36:16.798904+02:00",
+  "tickers_count": 47,
+  "rows": 7015
+}
