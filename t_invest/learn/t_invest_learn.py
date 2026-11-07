@@ -1,16 +1,17 @@
-# PROD CONTOUR ONLY
-# Python: 3.10
-# Файл: t_invest/learn/t_invest_learn.py
+# ============================================================
+# T-INVEST - WEEKLY TRAINER ORCHESTRATOR v1.0 (STOCKS)
+# Path: t_invest/learn/t_invest_learn.py
+# ============================================================
 
 import os
 import sys
 import json
-import joblib
+import logging
+import itertools
+import requests
 import numpy as np
 import pandas as pd
-import requests
-import importlib.util
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from t_tech.invest import Client
 from t_tech.invest.constants import INVEST_GRPC_API
 from t_tech.invest.schemas import CandleInterval
@@ -21,217 +22,265 @@ TOKEN = os.environ.get("T_INVEST_TOKEN")
 TG_TOKEN = os.environ.get("INVEST_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
 WHITELIST_PATH = "t_invest/data/scanner/whitelist.json"
+MODEL_OUT_FILE = "t_invest/data/model/best_params.json"
 
-MODELS_DIR = "t_invest/data/model"           # Куда сохраняем готовую модель
-CUSTOM_MODELS_SRC = "t_invest/learn/models"  # Откуда берем код моделей
+# Параметры бэктеста (взято из ARGUS)
+INITIAL_BALANCE = 100.0
+POSITION_NOTIONAL = 20.0
+FEE_RATE = 0.0005 # Комиссия Т-Инвест
+MIN_TRADES_FOR_FULL_SCORE = 30 # Для акций снижено (меньше сделок, чем на крипте)
 
-HISTORY_DAYS = 365
-CHUNK_DAYS = 90
-TARGET_HORIZON = 1
-TEST_SIZE = 0.2
+# Сетки параметров (взято из ARGUS)
+GRID_SWING = {
+    "use_trend_filter": [True, False],
+    "use_volume_filter": [True, False],
+    "rsi_min": [25, 30, 35],
+    "rsi_max": [50, 55, 60, 70],
+    "tp_pct": [3.0, 5.0, 8.0, 15.0],
+    "sl_pct": [2.0, 3.0, 5.0, 10.0],
+    "time_exit_h": [24, 48, 72, 168]
+}
 
-KLG_TZ = timezone(timedelta(hours=2))
+GRID_INTRADAY = {
+    "use_trend_filter": [True, False],
+    "use_volume_filter": [True, False],
+    "rsi_min": [25, 30, 35],
+    "rsi_max": [50, 55, 60, 70],
+    "tp_pct": [1.0, 1.5, 2.0, 3.0],
+    "sl_pct": [0.5, 1.0, 1.5, 2.0],
+    "time_exit_h": [4, 8, 12, 24]
+}
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("t_invest.trainer")
 
 def send_telegram(text):
-    if not TG_TOKEN or not TG_CHAT_ID:
-        return
-    url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-    payload = {"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}
+    if not TG_TOKEN or not TG_CHAT_ID: return
     try:
-        requests.post(url, json=payload, timeout=10)
+        url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
+        requests.post(url, json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=10)
     except Exception as e:
-        print(f"Telegram error: {e}")
+        log.error(f"Telegram error: {e}")
 
-def fetch_candles(client, figi, days=HISTORY_DAYS):
-    end = now()
-    start = end - timedelta(days=days)
-    all_candles = []
-    current = start
-    while current < end:
-        chunk_end = min(current + timedelta(days=CHUNK_DAYS), end)
-        try:
-            resp = client.market_data.get_candles(
-                figi=figi, from_=current, to=chunk_end,
-                interval=CandleInterval.CANDLE_INTERVAL_HOUR,
-            )
-            all_candles.extend(resp.candles)
-        except Exception as e:
-            print(f"Chunk error {figi}: {e}")
-        current = chunk_end
-    if not all_candles:
-        return None
-    rows = []
-    for c in all_candles:
-        rows.append({
-            "time": c.time,
-            "open": c.open.units + c.open.nano / 1e9,
-            "high": c.high.units + c.high.nano / 1e9,
-            "low": c.low.units + c.low.nano / 1e9,
-            "close": c.close.units + c.close.nano / 1e9,
-            "volume": c.volume,
-        })
-    df = pd.DataFrame(rows)
-    df["time"] = pd.to_datetime(df["time"], utc=True)
-    df.set_index("time", inplace=True)
-    return df
+# === ИНДИКАТОРЫ ===
+def calc_ema(series, period): return series.ewm(span=period, adjust=False).mean()
 
-def compute_rsi(series, period=14):
+def calc_rsi(series, period=14):
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def compute_macd(series, fast=12, slow=26, signal=9):
-    exp1 = series.ewm(span=fast, adjust=False).mean()
-    exp2 = series.ewm(span=slow, adjust=False).mean()
-    macd = exp1 - exp2
-    macd_signal = macd.ewm(span=signal, adjust=False).mean()
-    return macd, macd_signal
+def calc_macd_hist(series, fast=12, slow=26, signal=9):
+    ema_fast = calc_ema(series, fast)
+    ema_slow = calc_ema(series, slow)
+    macd_line = ema_fast - ema_slow
+    signal_line = calc_ema(macd_line, signal)
+    return macd_line - signal_line
 
-def add_features(df):
-    df["sma_10"] = df["close"].rolling(10).mean()
-    df["sma_50"] = df["close"].rolling(50).mean()
-    df["rsi"] = compute_rsi(df["close"], 14)
-    macd, signal = compute_macd(df["close"])
-    df["macd"] = macd
-    df["macd_signal"] = signal
-    df["volume_sma"] = df["volume"].rolling(20).mean()
-    df["volume_ratio"] = df["volume"] / df["volume_sma"]
-    df["target"] = (df["close"].shift(-TARGET_HORIZON) > df["close"]).astype(int)
-    df.dropna(inplace=True)
+def calc_atr(df, period=14):
+    high_low = df['high'] - df['low']
+    high_close = (df['high'] - df['close'].shift()).abs()
+    low_close = (df['low'] - df['close'].shift()).abs()
+    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+    return tr.rolling(window=period).mean()
+
+# === ЗАГРУЗКА ДАННЫХ ИЗ T-INVEST ===
+def fetch_data_from_tinvest(client, figi, days=365):
+    end = now()
+    start = end - timedelta(days=days)
+    all_candles = []
+    current = start
+    while current < end:
+        chunk_end = min(current + timedelta(days=90), end)
+        try:
+            resp = client.market_data.get_candles(
+                figi=figi, from_=current, to=chunk_end, interval=CandleInterval.CANDLE_INTERVAL_HOUR
+            )
+            all_candles.extend(resp.candles)
+        except Exception as e:
+            log.warning(f"Chunk error {figi}: {e}")
+        current = chunk_end
+    
+    if not all_candles: return pd.DataFrame()
+    
+    rows = [{"time": c.time, "open": c.open.units + c.open.nano/1e9, "high": c.high.units + c.high.nano/1e9,
+             "low": c.low.units + c.low.nano/1e9, "close": c.close.units + c.close.nano/1e9, "volume": c.volume} for c in all_candles]
+    
+    df = pd.DataFrame(rows)
+    df['time'] = pd.to_datetime(df['time'], utc=True)
     return df
 
-def profit_factor(y_true, y_pred, returns):
-    pnl = np.where(y_pred == 1, returns, -returns)
-    gross_profit = pnl[pnl > 0].sum()
-    gross_loss = abs(pnl[pnl < 0].sum())
-    if gross_loss == 0:
-        return gross_profit if gross_profit > 0 else 0.0
-    return gross_profit / gross_loss
+# === БЭКТЕСТ (ЛОГИКА ARGUS) ===
+def run_backtest(df, params, side="long"):
+    trades = []
+    in_pos = False
+    entry_price = 0.0
+    entry_idx = 0
 
-def load_models():
-    models = {}
-    if not os.path.exists(CUSTOM_MODELS_SRC):
-        print(f"⚠️ Папка с моделями не найдена: {CUSTOM_MODELS_SRC}")
-        return models
-
-    for filename in os.listdir(CUSTOM_MODELS_SRC):
-        if filename.startswith("model_") and filename.endswith(".py"):
-            module_name = filename[:-3]
-            file_path = os.path.join(CUSTOM_MODELS_SRC, filename)
-            
-            spec = importlib.util.spec_from_file_location(module_name, file_path)
-            module = importlib.util.module_from_spec(spec)
-            
-            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Регистрируем модуль в sys.modules, чтобы pickle его нашел
-            sys.modules[module_name] = module
-            spec.loader.exec_module(module)
-            
-            if hasattr(module, "Model"):
-                models[module_name] = module.Model()
+    for i, curr in enumerate(df.itertuples()):
+        if i == 0: continue
+        
+        if in_pos:
+            if side == "long":
+                gross_pct = (curr.close - entry_price) / entry_price * 100.0
             else:
-                print(f"⚠️ В файле {filename} нет класса Model")
-    return models
+                gross_pct = (entry_price - curr.close) / entry_price * 100.0
 
-def train_all_models(df):
-    feature_cols = ["open", "high", "low", "close", "volume",
-                    "sma_10", "sma_50", "rsi", "macd", "macd_signal",
-                    "volume_ratio"]
-    X = df[feature_cols].values
-    y = df["target"].values
-    returns = df["close"].pct_change().shift(-TARGET_HORIZON).fillna(0).values
+            bars_held = i - entry_idx
+            exit_reason = None
+            
+            if gross_pct <= -params["sl_pct"]: exit_reason = "STOP_LOSS"
+            elif gross_pct >= params["tp_pct"]: exit_reason = "TAKE_PROFIT"
+            elif bars_held >= params["time_exit_h"]: exit_reason = "TIME_EXIT"
+                
+            if exit_reason:
+                net_pct = gross_pct - (FEE_RATE * 200)
+                pnl_usd = POSITION_NOTIONAL * (net_pct / 100.0)
+                trades.append(pnl_usd)
+                in_pos = False
+        
+        if not in_pos:
+            if side == "long":
+                signal = curr.macd_hist > 0 and (params["rsi_min"] < curr.rsi < params["rsi_max"])
+                if params["use_trend_filter"]: signal = signal and (curr.close > curr.ema_50)
+            else:
+                signal = curr.macd_hist < 0 and (params["rsi_min"] < curr.rsi < params["rsi_max"])
+                if params["use_trend_filter"]: signal = signal and (curr.close < curr.ema_50)
 
-    split = int(len(df) * (1 - TEST_SIZE))
-    X_train, X_test = X[:split], X[split:]
-    y_train, y_test = y[:split], y[split:]
-    ret_test = returns[split:]
+            if params["use_volume_filter"]: signal = signal and (curr.volume > curr.vol_sma)
+                
+            if signal:
+                in_pos = True
+                entry_price = curr.close
+                entry_idx = i
 
-    models = load_models()
-    print(f"Загружено моделей: {len(models)}")
+    n = len(trades)
+    if n == 0: return None
 
-    results = {}
-    best_model = None
-    best_pf = -1
-    best_name = ""
+    pnls = np.array(trades)
+    total_pnl = float(pnls.sum())
+    cum = np.cumsum(pnls) + INITIAL_BALANCE
+    peak = np.maximum.accumulate(cum)
+    dd = (cum - peak) / peak * 100.0
+    max_dd = float(dd.min()) if len(dd) else 0.0
+    if max_dd == 0: max_dd = -0.1
 
-    for name, model in models.items():
-        try:
-            print(f"Обучение {name}...")
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
-            pf = profit_factor(y_test, y_pred, ret_test)
-            results[name] = pf
-            print(f"✅ {name}: Profit Factor = {pf:.4f}")
-            if pf > best_pf:
-                best_pf = pf
-                best_model = model
-                best_name = name
-        except Exception as e:
-            print(f"❌ Ошибка в {name}: {e}")
-            results[name] = None
+    raw_score = total_pnl / abs(max_dd)
+    trade_penalty = min(1.0, n / MIN_TRADES_FOR_FULL_SCORE)
+    adjusted_score = raw_score * trade_penalty
+    
+    return {"trades": n, "pnl": round(total_pnl, 2), "winrate": round(float((pnls > 0).mean()), 4),
+            "max_dd": round(max_dd, 2), "score": round(adjusted_score, 2), "raw_score": round(raw_score, 2)}
 
-    return best_model, best_name, best_pf, results
+# === ТРЕНЕР (ПЕРЕБОР СЕТКИ) ===
+def train_grid_search(df, side="long", mode="swing"):
+    grid = GRID_INTRADAY if mode == "intraday" else GRID_SWING
+    keys, values = zip(*grid.items())
+    combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
+    
+    best_result = None
+    best_params = None
 
+    for params in combinations:
+        res = run_backtest(df, params, side=side)
+        if res and (best_result is None or res["score"] > best_result["score"]):
+            best_result = res
+            best_params = params
+
+    if not best_params: return None
+    return {"params": best_params, "metrics": best_result}
+
+# === ГЛАВНЫЙ ОРКЕСТРАТОР ===
 def main():
+    log.info("STARTING T-INVEST WEEKLY TRAINER ORCHESTRATOR v1.0")
+    
     if not TOKEN or not os.path.exists(WHITELIST_PATH):
-        print("❌ Нет токена или whitelist.json")
+        log.error("No token or whitelist.json missing.")
         return
 
     with open(WHITELIST_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
     stocks = data["data"] if isinstance(data, dict) and "data" in data else data
-    tickers = {s["ticker"]: s["figi"] for s in stocks}
     
     all_dfs = []
+    data_start_time = None
+    data_end_time = None
+    
+    log.info("Downloading data from T-Invest...")
     with Client(TOKEN, target=INVEST_GRPC_API) as client:
-        for ticker, figi in tickers.items():
-            print(f"Скачивание {ticker}...")
-            df = fetch_candles(client, figi)
-            if df is not None and len(df) > 50:
-                df["ticker"] = ticker
+        for s in stocks:
+            ticker, figi = s["ticker"], s["figi"]
+            df = fetch_data_from_tinvest(client, figi)
+            if df.empty: continue
+            
+            if data_start_time is None or df['time'].min() < data_start_time: data_start_time = df['time'].min()
+            if data_end_time is None or df['time'].max() > data_end_time: data_end_time = df['time'].max()
+
+            # Индикаторы
+            df['rsi'] = calc_rsi(df['close'], 14)
+            df['macd_hist'] = calc_macd_hist(df['close'], 12, 26, 9)
+            df['ema_50'] = calc_ema(df['close'], 50)
+            df['vol_sma'] = df['volume'].rolling(window=20).mean()
+            df['atr_14'] = calc_atr(df, 14)
+            
+            df = df.dropna()
+            if len(df) > 100:
+                df['ticker'] = ticker
                 all_dfs.append(df)
+            log.info(f"Loaded {ticker}: {len(df)} rows")
 
     if not all_dfs:
-        send_telegram("⚠️ Обучение не удалось: нет данных.")
+        log.error("No data downloaded.")
         return
 
-    full_df = pd.concat(all_dfs)
-    full_df = add_features(full_df)
-    full_df.sort_index(inplace=True)
-    full_df = full_df[~full_df.index.duplicated(keep="first")]
+    # Склеиваем все акции в один датафрейм
+    full_df = pd.concat(all_dfs).reset_index(drop=True)
+    log.info(f"Total combined rows: {len(full_df)}")
 
-    best_model, best_name, best_pf, results = train_all_models(full_df)
-
-    if best_model is None:
-        send_telegram("⚠️ Турнир не дал результатов.")
-        return
-
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    model_path = os.path.join(MODELS_DIR, "best_model.pkl")
-    
-    # Сохраняем модель (теперь pickle сможет найти класс)
-    joblib.dump(best_model, model_path)
-
-    leaderboard = {
-        "winner": best_name,
-        "profit_factor": best_pf,
-        "all_results": results,
-        "trained_at": datetime.now(KLG_TZ).isoformat(),
-        "tickers_count": len(tickers),
-        "rows": len(full_df),
+    out_data = {
+        "trainer_version": "1.0-stocks",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "data_start": data_start_time.strftime("%Y-%m-%d"),
+        "data_end": data_end_time.strftime("%Y-%m-%d"),
+        "total_rows": len(full_df),
+        "intraday": {"long": None, "short": None},
+        "swing": {"long": None, "short": None}
     }
-    with open(os.path.join(MODELS_DIR, "leaderboard.json"), "w", encoding="utf-8") as f:
-        json.dump(leaderboard, f, ensure_ascii=False, indent=2)
 
+    # Прогон по 4 режимам (intraday/swing x long/short)
+    for mode in ["intraday", "swing"]:
+        for side in ["long", "short"]:
+            log.info(f"--- Searching best params for {mode.upper()} / {side.upper()} ---")
+            best_data = train_grid_search(full_df, side=side, mode=mode)
+            if best_data:
+                out_data[mode][side] = best_data
+                log.info(f"  🏆 Best Score: {best_data['metrics']['score']} | Params: {best_data['params']}")
+            else:
+                log.warning(f"  ⚠️ No trades generated for {mode}/{side}")
+
+    os.makedirs(os.path.dirname(MODEL_OUT_FILE), exist_ok=True)
+    with open(MODEL_OUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(out_data, f, ensure_ascii=False, indent=2)
+    log.info(f"💾 Saved to {MODEL_OUT_FILE}")
+
+    # Отправка в телеграм
     msg = (
-        f"🏆 <b>Обучение завершено</b>\n\n"
-        f"Победитель: <b>{best_name}</b>\n"
-        f"Profit Factor: <b>{best_pf:.2f}</b>\n"
-        f"Время (КЛГ): {datetime.now(KLG_TZ).strftime('%d.%m.%Y %H:%M')}"
+        f"🏆 <b>Обучение (ARGUS Grid) завершено</b>\n\n"
+        f"📅 Период: {out_data['data_start']} — {out_data['data_end']}\n"
+        f"📊 Всего строк: {len(full_df)}\n\n"
     )
+    for mode in ["intraday", "swing"]:
+        for side in ["long", "short"]:
+            res = out_data[mode][side]
+            if res:
+                msg += f"<b>{mode.upper()} {side.upper()}</b>: Score {res['metrics']['score']} (PnL: {res['metrics']['pnl']}$, Сделок: {res['metrics']['trades']})\n"
+            else:
+                msg += f"<b>{mode.upper()} {side.upper()}</b>: Нет сделок\n"
+    
     send_telegram(msg)
-    print("Готово.")
+    log.info("Done.")
 
 if __name__ == "__main__":
     main()
