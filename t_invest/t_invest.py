@@ -1,53 +1,29 @@
 import os
-from datetime import timedelta
-from t_tech.invest import Client, CandleInterval
-from t_tech.invest.utils import now
+from t_tech.invest import Client, InvestApiTarget
 
-TOKEN = os.environ.get("T_INVEST_TOKEN")
+# Берем оба ключа из секретов
+TOKEN_PROD = os.environ.get("T_INVEST_TOKEN")
+TOKEN_SANDBOX = os.environ.get("T_SANDBOX")
+
+def check_token(token, target, name):
+    if not token:
+        print(f"⚠️ Токен для {name} не найден.")
+        return
+    try:
+        with Client(token, target=target) as client:
+            accounts = client.users.get_accounts()
+            print(f"✅ Токен РАБОТАЕТ в {name}! Найдено счетов: {len(accounts.accounts)}")
+            for acc in accounts.accounts:
+                print(f"   - ID: {acc.id}, Название: {acc.name}")
+    except Exception as e:
+        print(f"❌ Токен НЕ работает в {name}. Ошибка: {e}")
 
 def main():
-    if not TOKEN:
-        print("!!! Ошибка: переменная T_INVEST_TOKEN не задана.")
-        return
+    print("--- ПРОВЕРКА РЕАЛЬНОГО ТОКЕНА (PROD) ---")
+    check_token(TOKEN_PROD, InvestApiTarget.PROD, "REAL")
 
-    with Client(TOKEN) as client:
-        try:
-            # 1. Счета
-            accounts = client.users.get_accounts()
-            print(f"✅ Счета получены: {len(accounts.accounts)}")
-            if not accounts.accounts:
-                print("Нет счетов для тестирования.")
-                return
-            account_id = accounts.accounts[0].id
-
-            # 2. Портфель
-            portfolio = client.operations.get_portfolio(account_id=account_id)
-            print(f"✅ Портфель получен: {len(portfolio.positions)} позиций")
-
-            # 3. Позиции
-            positions = client.operations.get_positions(account_id=account_id)
-            print(f"✅ Позиции получены: {len(positions.securities)} бумаг")
-
-            # 4. Доступный остаток для вывода
-            limits = client.operations.get_withdraw_limits(account_id=account_id)
-            print(f"✅ Лимиты на вывод получены.")
-
-            # 5. История свечей (Сбербанк)
-            candles = client.get_all_candles(
-                figi="BBG004730N88",
-                from_=now() - timedelta(days=30),
-                interval=CandleInterval.CANDLE_INTERVAL_HOUR,
-            )
-            print(f"✅ Свечи получены: {len(candles)} штук.")
-
-            # 6. Информация об инструментах
-            instruments = client.instruments.shares()
-            print(f"✅ Список акций получен: {len(instruments.instruments)} шт.")
-
-            print("\n--- ВСЕ ОСНОВНЫЕ ЗАПРОСЫ УСПЕШНО ВЫПОЛНЕНЫ ---")
-
-        except Exception as e:
-            print(f"❌ Произошла ошибка: {e}")
+    print("\n--- ПРОВЕРКА ТОКЕНА ПЕСОЧНИЦЫ (SANDBOX) ---")
+    check_token(TOKEN_SANDBOX, InvestApiTarget.SANDBOX, "SANDBOX")
 
 if __name__ == "__main__":
     main()
