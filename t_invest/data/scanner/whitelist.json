@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "collected_at": "2026-11-07T13:11:59.507163+00:00",
-    "period_start": "2026-10-28T13:11:59.507163+00:00",
-    "period_end": "2026-11-07T13:11:59.507163+00:00",
+    "collected_at": "2026-11-07T14:30:58.753045+00:00",
+    "period_start": "2026-10-28T14:30:58.753045+00:00",
+    "period_end": "2026-11-07T14:30:58.753045+00:00",
     "candles_days": 10,
     "min_turnover_rub": 50000000,
     "max_spread_percent": 0.5,
@@ -20,14 +20,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 921.8,
-      "avg_daily_turnover_rub": 677243633.24,
-      "spread_pct": 0.0651,
+      "last_price": 924.0,
+      "avg_daily_turnover_rub": 678391330.64,
+      "spread_pct": 0.065,
       "avg_daily_range_pct": 5.37,
       "volatility_tag": "HIGH_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:16.439391+00:00"
+      "updated_at": "2026-11-07T14:30:19.051550+00:00"
     },
     {
       "ticker": "VKCO",
@@ -39,13 +39,13 @@
       "sell_available": true,
       "lot": 1,
       "last_price": 234.1,
-      "avg_daily_turnover_rub": 13346351528.52,
-      "spread_pct": 0.0214,
+      "avg_daily_turnover_rub": 13347840191.7,
+      "spread_pct": 0.0213,
       "avg_daily_range_pct": 10.78,
       "volatility_tag": "HIGH_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:16.833128+00:00"
+      "updated_at": "2026-11-07T14:30:19.408859+00:00"
     },
     {
       "ticker": "MGNT",
@@ -56,14 +56,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 1888.5,
-      "avg_daily_turnover_rub": 726856534.32,
-      "spread_pct": 0.0265,
+      "last_price": 1890.5,
+      "avg_daily_turnover_rub": 727133938.73,
+      "spread_pct": 0.0529,
       "avg_daily_range_pct": 4.22,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:17.241822+00:00"
+      "updated_at": "2026-11-07T14:30:19.777557+00:00"
     },
     {
       "ticker": "SELG",
@@ -74,14 +74,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 10,
-      "last_price": 39.72,
-      "avg_daily_turnover_rub": 91457835.22,
-      "spread_pct": 0.0755,
+      "last_price": 39.73,
+      "avg_daily_turnover_rub": 91524662.95,
+      "spread_pct": 0.0252,
       "avg_daily_range_pct": 6.95,
       "volatility_tag": "HIGH_VOL",
       "trend": "DOWN",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:18.252799+00:00"
+      "updated_at": "2026-11-07T14:30:20.664040+00:00"
     },
     {
       "ticker": "ALRS",
@@ -92,14 +92,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 10,
-      "last_price": 24.58,
-      "avg_daily_turnover_rub": 162247276.38,
-      "spread_pct": 0.0407,
+      "last_price": 24.63,
+      "avg_daily_turnover_rub": 162557374.94,
+      "spread_pct": 0.0406,
       "avg_daily_range_pct": 4.45,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:19.428262+00:00"
+      "updated_at": "2026-11-07T14:30:21.725946+00:00"
     },
     {
       "ticker": "TATN",
@@ -110,14 +110,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 611.6,
-      "avg_daily_turnover_rub": 1147670912.74,
-      "spread_pct": 0.0164,
+      "last_price": 611.8,
+      "avg_daily_turnover_rub": 1148007208.88,
+      "spread_pct": 0.0163,
       "avg_daily_range_pct": 2.25,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:20.249085+00:00"
+      "updated_at": "2026-11-07T14:30:22.435826+00:00"
     },
     {
       "ticker": "PRMD",
@@ -128,14 +128,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 419.0,
-      "avg_daily_turnover_rub": 52286862.33,
-      "spread_pct": 0.0717,
+      "last_price": 418.95,
+      "avg_daily_turnover_rub": 52337537.65,
+      "spread_pct": 0.0478,
       "avg_daily_range_pct": 1.99,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:21.037206+00:00"
+      "updated_at": "2026-11-07T14:30:23.154045+00:00"
     },
     {
       "ticker": "TRNFP",
@@ -146,14 +146,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 1055.0,
-      "avg_daily_turnover_rub": 515343772.33,
-      "spread_pct": 0.0759,
+      "last_price": 1053.8,
+      "avg_daily_turnover_rub": 515934438.98,
+      "spread_pct": 0.057,
       "avg_daily_range_pct": 1.57,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:21.831945+00:00"
+      "updated_at": "2026-11-07T14:30:23.872234+00:00"
     },
     {
       "ticker": "DOMRF",
@@ -164,14 +164,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 2131.7,
-      "avg_daily_turnover_rub": 483460830.3,
-      "spread_pct": 0.0375,
+      "last_price": 2131.4,
+      "avg_daily_turnover_rub": 483633191.15,
+      "spread_pct": 0.0094,
       "avg_daily_range_pct": 1.62,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:22.224834+00:00"
+      "updated_at": "2026-11-07T14:30:24.225933+00:00"
     },
     {
       "ticker": "RAGR",
@@ -182,14 +182,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 71.44,
-      "avg_daily_turnover_rub": 314591760.14,
+      "last_price": 71.4,
+      "avg_daily_turnover_rub": 314815588.66,
       "spread_pct": 0.028,
       "avg_daily_range_pct": 2.57,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:22.616788+00:00"
+      "updated_at": "2026-11-07T14:30:24.580527+00:00"
     },
     {
       "ticker": "UWGN",
@@ -200,14 +200,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 24.2,
-      "avg_daily_turnover_rub": 94820007.3,
-      "spread_pct": 0.0827,
+      "last_price": 24.14,
+      "avg_daily_turnover_rub": 94889025.39,
+      "spread_pct": 0.0829,
       "avg_daily_range_pct": 4.87,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:23.008837+00:00"
+      "updated_at": "2026-11-07T14:30:24.934475+00:00"
     },
     {
       "ticker": "SNGSP",
@@ -218,14 +218,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 10,
-      "last_price": 43.205,
-      "avg_daily_turnover_rub": 57921918.01,
-      "spread_pct": 0.0463,
+      "last_price": 43.135,
+      "avg_daily_turnover_rub": 58046274.8,
+      "spread_pct": 0.0232,
       "avg_daily_range_pct": 1.27,
       "volatility_tag": "LOW_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:23.400759+00:00"
+      "updated_at": "2026-11-07T14:30:25.290330+00:00"
     },
     {
       "ticker": "MOEX",
@@ -236,14 +236,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 10,
-      "last_price": 163.84,
-      "avg_daily_turnover_rub": 66808114.61,
+      "last_price": 163.91,
+      "avg_daily_turnover_rub": 66837708.61,
       "spread_pct": 0.0061,
       "avg_daily_range_pct": 1.95,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:24.585555+00:00"
+      "updated_at": "2026-11-07T14:30:26.177675+00:00"
     },
     {
       "ticker": "ROSN",
@@ -254,14 +254,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 363.55,
-      "avg_daily_turnover_rub": 1943829850.2,
-      "spread_pct": 0.0275,
+      "last_price": 363.45,
+      "avg_daily_turnover_rub": 1944551020.87,
+      "spread_pct": 0.0138,
       "avg_daily_range_pct": 2.17,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:25.371272+00:00"
+      "updated_at": "2026-11-07T14:30:26.890936+00:00"
     },
     {
       "ticker": "ENPG",
@@ -272,14 +272,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 329.7,
-      "avg_daily_turnover_rub": 94572201.93,
-      "spread_pct": 0.1517,
+      "last_price": 330.1,
+      "avg_daily_turnover_rub": 94683661.62,
+      "spread_pct": 0.0606,
       "avg_daily_range_pct": 2.8,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:26.357185+00:00"
+      "updated_at": "2026-11-07T14:30:27.782764+00:00"
     },
     {
       "ticker": "T",
@@ -290,14 +290,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 271.9,
-      "avg_daily_turnover_rub": 2613699317.75,
+      "last_price": 271.8,
+      "avg_daily_turnover_rub": 2615121451.33,
       "spread_pct": 0.0147,
       "avg_daily_range_pct": 1.23,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:26.750082+00:00"
+      "updated_at": "2026-11-07T14:30:28.135329+00:00"
     },
     {
       "ticker": "VSEH",
@@ -308,14 +308,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 89.63,
-      "avg_daily_turnover_rub": 140327505.05,
-      "spread_pct": 0.0223,
+      "last_price": 89.52,
+      "avg_daily_turnover_rub": 140436965.04,
+      "spread_pct": 0.0335,
       "avg_daily_range_pct": 2.86,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:27.144034+00:00"
+      "updated_at": "2026-11-07T14:30:28.491115+00:00"
     },
     {
       "ticker": "HEAD",
@@ -326,14 +326,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 2748.0,
-      "avg_daily_turnover_rub": 200985144.27,
-      "spread_pct": 0.0728,
+      "last_price": 2751.0,
+      "avg_daily_turnover_rub": 201420437.73,
+      "spread_pct": 0.0727,
       "avg_daily_range_pct": 1.54,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:28.721909+00:00"
+      "updated_at": "2026-11-07T14:30:29.920228+00:00"
     },
     {
       "ticker": "SBER",
@@ -344,14 +344,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 294.01,
-      "avg_daily_turnover_rub": 4153864558.67,
+      "last_price": 293.93,
+      "avg_daily_turnover_rub": 4156866330.67,
       "spread_pct": 0.0034,
       "avg_daily_range_pct": 1.18,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:29.500216+00:00"
+      "updated_at": "2026-11-07T14:30:30.626800+00:00"
     },
     {
       "ticker": "GAZP",
@@ -362,14 +362,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 10,
-      "last_price": 114.48,
-      "avg_daily_turnover_rub": 622028771.78,
-      "spread_pct": 0.0087,
+      "last_price": 114.47,
+      "avg_daily_turnover_rub": 622396761.66,
+      "spread_pct": 0.0175,
       "avg_daily_range_pct": 2.5,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:29.892117+00:00"
+      "updated_at": "2026-11-07T14:30:30.979676+00:00"
     },
     {
       "ticker": "POSI",
@@ -380,14 +380,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 1390.8,
-      "avg_daily_turnover_rub": 738030363.45,
-      "spread_pct": 0.0431,
+      "last_price": 1391.8,
+      "avg_daily_turnover_rub": 740461571.8,
+      "spread_pct": 0.0144,
       "avg_daily_range_pct": 3.81,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:31.072954+00:00"
+      "updated_at": "2026-11-07T14:30:32.044672+00:00"
     },
     {
       "ticker": "SIBN",
@@ -398,14 +398,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 524.05,
-      "avg_daily_turnover_rub": 470538317.94,
-      "spread_pct": 0.0095,
+      "last_price": 524.1,
+      "avg_daily_turnover_rub": 470783839.62,
+      "spread_pct": 0.0191,
       "avg_daily_range_pct": 2.59,
       "volatility_tag": "MID_VOL",
       "trend": "DOWN",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:31.464595+00:00"
+      "updated_at": "2026-11-07T14:30:32.402720+00:00"
     },
     {
       "ticker": "GMKN",
@@ -416,14 +416,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 10,
-      "last_price": 117.1,
-      "avg_daily_turnover_rub": 125762166.76,
+      "last_price": 117.2,
+      "avg_daily_turnover_rub": 125788779.88,
       "spread_pct": 0.0171,
       "avg_daily_range_pct": 1.75,
       "volatility_tag": "LOW_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:34.017707+00:00"
+      "updated_at": "2026-11-07T14:30:34.702741+00:00"
     },
     {
       "ticker": "PLZL",
@@ -434,14 +434,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 1070.4,
-      "avg_daily_turnover_rub": 2286980346.78,
+      "last_price": 1070.2,
+      "avg_daily_turnover_rub": 2287514245.38,
       "spread_pct": 0.0187,
       "avg_daily_range_pct": 2.9,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:35.580716+00:00"
+      "updated_at": "2026-11-07T14:30:36.147052+00:00"
     },
     {
       "ticker": "OZON",
@@ -452,14 +452,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 3770.5,
-      "avg_daily_turnover_rub": 3718419361.5,
+      "last_price": 3771.0,
+      "avg_daily_turnover_rub": 3718775841.18,
       "spread_pct": 0.0133,
       "avg_daily_range_pct": 2.38,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:36.367896+00:00"
+      "updated_at": "2026-11-07T14:30:36.855208+00:00"
     },
     {
       "ticker": "DATA",
@@ -470,14 +470,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 102.38,
-      "avg_daily_turnover_rub": 51978399.05,
-      "spread_pct": 0.0586,
+      "last_price": 102.12,
+      "avg_daily_turnover_rub": 52137122.38,
+      "spread_pct": 0.1763,
       "avg_daily_range_pct": 3.14,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:37.151638+00:00"
+      "updated_at": "2026-11-07T14:30:37.386084+00:00"
     },
     {
       "ticker": "PHOR",
@@ -488,14 +488,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 5231.0,
-      "avg_daily_turnover_rub": 879624622.55,
-      "spread_pct": 0.0574,
+      "last_price": 5235.0,
+      "avg_daily_turnover_rub": 880067317.45,
+      "spread_pct": 0.0573,
       "avg_daily_range_pct": 2.86,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:39.119211+00:00"
+      "updated_at": "2026-11-07T14:30:39.160815+00:00"
     },
     {
       "ticker": "TATNP",
@@ -506,14 +506,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 594.6,
-      "avg_daily_turnover_rub": 330945363.69,
-      "spread_pct": 0.0673,
+      "last_price": 594.1,
+      "avg_daily_turnover_rub": 331311681.89,
+      "spread_pct": 0.0336,
       "avg_daily_range_pct": 2.03,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:39.902924+00:00"
+      "updated_at": "2026-11-07T14:30:40.137736+00:00"
     },
     {
       "ticker": "MAGN",
@@ -524,14 +524,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 10,
-      "last_price": 22.555,
-      "avg_daily_turnover_rub": 55172431.94,
-      "spread_pct": 0.0665,
-      "avg_daily_range_pct": 2.11,
+      "last_price": 22.53,
+      "avg_daily_turnover_rub": 55632361.22,
+      "spread_pct": 0.0444,
+      "avg_daily_range_pct": 2.17,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:40.297794+00:00"
+      "updated_at": "2026-11-07T14:30:40.506777+00:00"
     },
     {
       "ticker": "VTBR",
@@ -542,14 +542,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 57.135,
-      "avg_daily_turnover_rub": 2384716220.97,
-      "spread_pct": 0.0088,
+      "last_price": 57.18,
+      "avg_daily_turnover_rub": 2385720043.78,
+      "spread_pct": 0.0087,
       "avg_daily_range_pct": 2.25,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:40.691623+00:00"
+      "updated_at": "2026-11-07T14:30:40.949577+00:00"
     },
     {
       "ticker": "BANEP",
@@ -560,14 +560,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 797.0,
-      "avg_daily_turnover_rub": 53622332.68,
-      "spread_pct": 0.1256,
+      "last_price": 795.5,
+      "avg_daily_turnover_rub": 53734253.77,
+      "spread_pct": 0.1257,
       "avg_daily_range_pct": 2.06,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:41.086726+00:00"
+      "updated_at": "2026-11-07T14:30:41.308082+00:00"
     },
     {
       "ticker": "SPBE",
@@ -578,14 +578,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 179.0,
-      "avg_daily_turnover_rub": 147233556.28,
-      "spread_pct": 0.1672,
+      "last_price": 179.7,
+      "avg_daily_turnover_rub": 147309722.1,
+      "spread_pct": 0.1669,
       "avg_daily_range_pct": 3.95,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:42.263266+00:00"
+      "updated_at": "2026-11-07T14:30:42.414267+00:00"
     },
     {
       "ticker": "X5",
@@ -596,14 +596,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 2379.5,
-      "avg_daily_turnover_rub": 1679091957.09,
-      "spread_pct": 0.0631,
+      "last_price": 2375.5,
+      "avg_daily_turnover_rub": 1680771300.36,
+      "spread_pct": 0.021,
       "avg_daily_range_pct": 3.03,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:45.982366+00:00"
+      "updated_at": "2026-11-07T14:30:46.504583+00:00"
     },
     {
       "ticker": "NVTK",
@@ -614,14 +614,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 1145.4,
-      "avg_daily_turnover_rub": 2278779848.47,
+      "last_price": 1142.8,
+      "avg_daily_turnover_rub": 2281612155.98,
       "spread_pct": 0.0175,
       "avg_daily_range_pct": 2.45,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:46.373283+00:00"
+      "updated_at": "2026-11-07T14:30:46.859155+00:00"
     },
     {
       "ticker": "CHMF",
@@ -632,14 +632,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 692.6,
-      "avg_daily_turnover_rub": 655708074.42,
-      "spread_pct": 0.0289,
+      "last_price": 693.6,
+      "avg_daily_turnover_rub": 656143673.38,
+      "spread_pct": 0.0288,
       "avg_daily_range_pct": 2.18,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:49.305871+00:00"
+      "updated_at": "2026-11-07T14:30:49.522961+00:00"
     },
     {
       "ticker": "LSRG",
@@ -650,14 +650,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 918.2,
-      "avg_daily_turnover_rub": 1185816060.0,
+      "last_price": 917.0,
+      "avg_daily_turnover_rub": 1186159287.76,
       "spread_pct": 0.0872,
       "avg_daily_range_pct": 10.35,
       "volatility_tag": "HIGH_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:49.722995+00:00"
+      "updated_at": "2026-11-07T14:30:49.877620+00:00"
     },
     {
       "ticker": "YDEX",
@@ -668,14 +668,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 3416.0,
-      "avg_daily_turnover_rub": 2483338225.05,
-      "spread_pct": 0.0293,
+      "last_price": 3415.0,
+      "avg_daily_turnover_rub": 2484117992.41,
+      "spread_pct": 0.0146,
       "avg_daily_range_pct": 1.94,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:50.508242+00:00"
+      "updated_at": "2026-11-07T14:30:50.588746+00:00"
     },
     {
       "ticker": "AFLT",
@@ -686,14 +686,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 10,
-      "last_price": 38.71,
-      "avg_daily_turnover_rub": 72116840.11,
+      "last_price": 38.75,
+      "avg_daily_turnover_rub": 72168670.31,
       "spread_pct": 0.0258,
       "avg_daily_range_pct": 2.86,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:51.296408+00:00"
+      "updated_at": "2026-11-07T14:30:51.295082+00:00"
     },
     {
       "ticker": "MTLR",
@@ -704,14 +704,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 45.31,
-      "avg_daily_turnover_rub": 388419820.49,
-      "spread_pct": 0.0442,
+      "last_price": 45.35,
+      "avg_daily_turnover_rub": 388676428.92,
+      "spread_pct": 0.0662,
       "avg_daily_range_pct": 2.88,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:52.070810+00:00"
+      "updated_at": "2026-11-07T14:30:51.999856+00:00"
     },
     {
       "ticker": "MDMG",
@@ -722,14 +722,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 1304.9,
-      "avg_daily_turnover_rub": 67154603.61,
-      "spread_pct": 0.0767,
+      "last_price": 1303.5,
+      "avg_daily_turnover_rub": 67225546.74,
+      "spread_pct": 0.092,
       "avg_daily_range_pct": 0.98,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:53.047837+00:00"
+      "updated_at": "2026-11-07T14:30:52.886291+00:00"
     },
     {
       "ticker": "SBERP",
@@ -740,14 +740,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 294.7,
-      "avg_daily_turnover_rub": 290823323.95,
+      "last_price": 294.66,
+      "avg_daily_turnover_rub": 291464733.63,
       "spread_pct": 0.0034,
       "avg_daily_range_pct": 1.16,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:53.440447+00:00"
+      "updated_at": "2026-11-07T14:30:53.240886+00:00"
     },
     {
       "ticker": "LENT",
@@ -758,14 +758,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 1949.0,
-      "avg_daily_turnover_rub": 73079242.77,
-      "spread_pct": 0.1283,
-      "avg_daily_range_pct": 3.82,
+      "last_price": 1951.5,
+      "avg_daily_turnover_rub": 73142822.05,
+      "spread_pct": 0.0769,
+      "avg_daily_range_pct": 3.84,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:53.834580+00:00"
+      "updated_at": "2026-11-07T14:30:53.597766+00:00"
     },
     {
       "ticker": "ASTR",
@@ -776,14 +776,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 224.15,
-      "avg_daily_turnover_rub": 387857873.34,
-      "spread_pct": 0.0446,
+      "last_price": 224.65,
+      "avg_daily_turnover_rub": 388566261.42,
+      "spread_pct": 0.0223,
       "avg_daily_range_pct": 3.57,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:54.226272+00:00"
+      "updated_at": "2026-11-07T14:30:53.952528+00:00"
     },
     {
       "ticker": "RNFT",
@@ -794,14 +794,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 88.5,
-      "avg_daily_turnover_rub": 159268547.33,
-      "spread_pct": 0.0565,
+      "last_price": 88.45,
+      "avg_daily_turnover_rub": 159296098.23,
+      "spread_pct": 0.0566,
       "avg_daily_range_pct": 2.68,
       "volatility_tag": "MID_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:55.207720+00:00"
+      "updated_at": "2026-11-07T14:30:54.838792+00:00"
     },
     {
       "ticker": "BELU",
@@ -812,14 +812,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 273.2,
-      "avg_daily_turnover_rub": 72043969.4,
-      "spread_pct": 0.0733,
+      "last_price": 272.4,
+      "avg_daily_turnover_rub": 72199366.49,
+      "spread_pct": 0.0734,
       "avg_daily_range_pct": 2.66,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:56.180772+00:00"
+      "updated_at": "2026-11-07T14:30:55.724800+00:00"
     },
     {
       "ticker": "FESH",
@@ -830,14 +830,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 75.88,
-      "avg_daily_turnover_rub": 109763631.04,
-      "spread_pct": 0.0659,
+      "last_price": 76.07,
+      "avg_daily_turnover_rub": 110147917.43,
+      "spread_pct": 0.1448,
       "avg_daily_range_pct": 2.8,
       "volatility_tag": "MID_VOL",
       "trend": "UP",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:56.571652+00:00"
+      "updated_at": "2026-11-07T14:30:56.083649+00:00"
     },
     {
       "ticker": "LKOH",
@@ -848,14 +848,14 @@
       "buy_available": true,
       "sell_available": true,
       "lot": 1,
-      "last_price": 6092.5,
-      "avg_daily_turnover_rub": 4185178586.73,
+      "last_price": 6095.5,
+      "avg_daily_turnover_rub": 4186277039.45,
       "spread_pct": 0.0082,
       "avg_daily_range_pct": 1.77,
       "volatility_tag": "LOW_VOL",
       "trend": "SIDEWAYS",
       "is_new": false,
-      "updated_at": "2026-11-07T13:11:57.749953+00:00"
+      "updated_at": "2026-11-07T14:30:57.152107+00:00"
     }
   ]
 }
