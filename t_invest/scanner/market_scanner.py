@@ -14,9 +14,9 @@ from t_tech.invest.utils import now
 TOKEN = os.environ.get("T_INVEST_TOKEN")
 
 # === ЖЕСТКИЕ ФИЛЬТРЫ ЛИКВИДНОСТИ ===
-MIN_DAILY_TURNOVER_RUB = 50_000_000  # Минимальный оборот в день — 50 млн руб.
-MAX_SPREAD_PERCENT = 0.5             # Максимальный спред — 0.5%
-CANDLES_DAYS = 10                    # Период для расчета среднего оборота
+MIN_DAILY_TURNOVER_RUB = 50_000_000
+MAX_SPREAD_PERCENT = 0.5
+CANDLES_DAYS = 10
 
 def quotation_to_float(q):
     if q is None:
@@ -45,7 +45,6 @@ def classify_trend(closes):
 def analyze_share(client, share):
     figi = share.figi
 
-    # ФИЛЬТР 1: Флаги доступности торговли и ликвидности от самого Т-Банка
     if not share.api_trade_available_flag:
         return None, "Нет доступа через API"
     if not share.buy_available_flag or not share.sell_available_flag:
@@ -53,7 +52,6 @@ def analyze_share(client, share):
     if not share.liquidity_flag:
         return None, "Не помечена как ликвидная"
 
-    # ФИЛЬТР 2: Проверка спреда в реальном стакане
     try:
         ob = client.market_data.get_order_book(figi=figi, depth=1)
         if not ob.bids or not ob.asks:
@@ -64,11 +62,10 @@ def analyze_share(client, share):
             return None, "Нулевые цены"
         spread_pct = (best_ask - best_bid) / best_bid * 100
         if spread_pct > MAX_SPREAD_PERCENT:
-            return None, f"Спред {spread_pct:.2f}% > {MAX_SPREAD_PERCENT}%"
+            return None, f"Спред {spread_pct:.2f}%"
     except Exception as e:
         return None, f"Ошибка стакана: {e}"
 
-    # ФИЛЬТР 3: Проверка среднего дневного оборота в рублях
     try:
         candles_resp = client.market_data.get_candles(
             figi=figi,
@@ -78,7 +75,7 @@ def analyze_share(client, share):
         )
         candles = candles_resp.candles
         if len(candles) < 3:
-            return None, "Мало дневных свечей"
+            return None, "Мало свечей"
     except Exception as e:
         return None, f"Ошибка свечей: {e}"
 
@@ -94,7 +91,7 @@ def analyze_share(client, share):
 
     avg_turnover = sum(turnovers) / len(turnovers)
     if avg_turnover < MIN_DAILY_TURNOVER_RUB:
-        return None, f"Оборот {avg_turnover/1e6:.1f} млн < 50 млн"
+        return None, "Низкий оборот"
 
     avg_range = sum(ranges) / len(ranges) if ranges else 0
 
@@ -102,10 +99,10 @@ def analyze_share(client, share):
         "ticker": share.ticker,
         "figi": figi,
         "name": share.name,
-        "trade_method": "API",
-        "api_trade_available": True,
-        "buy_available": True,
-        "sell_available": True,
+        "trade_method": "API" if share.api_trade_available_flag else "MANUAL",
+        "api_trade_available": share.api_trade_available_flag,
+        "buy_available": share.buy_available_flag,
+        "sell_available": share.sell_available_flag,
         "lot": share.lot,
         "last_price": quotation_to_float(candles[-1].close),
         "avg_daily_turnover_rub": round(avg_turnover, 2),
@@ -129,7 +126,12 @@ def main():
             with open(output_path, "r", encoding="utf-8") as f:
                 content = f.read().strip()
                 if content:
-                    old_data = {item["ticker"]: item for item in json.loads(content)}
+                    parsed = json.loads(content)
+                    # Поддержка нового и старого формата
+                    if isinstance(parsed, dict) and "data" in parsed:
+                        old_data = {item["ticker"]: item for item in parsed["data"]}
+                    elif isinstance(parsed, list):
+                        old_data = {item["ticker"]: item for item in parsed}
         except Exception as e:
             print(f"⚠️ Старый whitelist не прочитан: {e}")
 
@@ -154,9 +156,28 @@ def main():
         print(f"\n✅ Ликвидных акций прошло все фильтры: {len(results)}")
         print(f"⛔ Отсеяно неликвидных: {skipped}")
 
+        # === ФОРМИРУЕМ МЕТАДАННЫЕ ===
+        now_utc = datetime.now(timezone.utc)
+        period_start = now_utc - timedelta(days=CANDLES_DAYS)
+
+        final_data = {
+            "metadata": {
+                "collected_at": now_utc.isoformat(),
+                "period_start": period_start.isoformat(),
+                "period_end": now_utc.isoformat(),
+                "candles_days": CANDLES_DAYS,
+                "min_turnover_rub": MIN_DAILY_TURNOVER_RUB,
+                "max_spread_percent": MAX_SPREAD_PERCENT,
+                "total_found": len(results),
+                "total_skipped": skipped,
+                "version": "1.0"
+            },
+            "data": results
+        }
+
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
+            json.dump(final_data, f, ensure_ascii=False, indent=2)
 
         print(f"💾 Сохранено в {output_path}")
 
