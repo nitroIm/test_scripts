@@ -18,9 +18,9 @@ MIN_DAILY_TURNOVER_RUB = 50_000_000  # 50 млн рублей
 MAX_SPREAD_PERCENT = 0.5             # 0.5%
 CANDLES_DAYS = 10                    # сколько дней истории брать для анализа
 
+# Оставили только те статусы, которые точно есть в версии 1.49.3
 ALLOWED_STATUSES = {
     SecurityTradingStatus.SECURITY_TRADING_STATUS_NORMAL_TRADING,
-    SecurityTradingStatus.SECURITY_TRADING_STATUS_OPENING_AUCTION,
     SecurityTradingStatus.SECURITY_TRADING_STATUS_CLOSING_AUCTION,
 }
 
