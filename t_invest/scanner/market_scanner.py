@@ -13,10 +13,10 @@ from t_tech.invest.utils import now
 
 TOKEN = os.environ.get("T_INVEST_TOKEN")
 
-# === НАСТРОЙКИ ФИЛЬТРОВ ===
-MIN_DAILY_TURNOVER_RUB = 50_000_000  # 50 млн рублей
-MAX_SPREAD_PERCENT = 0.5             # 0.5%
-CANDLES_DAYS = 10
+# === ЖЕСТКИЕ ФИЛЬТРЫ ЛИКВИДНОСТИ ===
+MIN_DAILY_TURNOVER_RUB = 50_000_000  # Минимальный оборот в день — 50 млн руб.
+MAX_SPREAD_PERCENT = 0.5             # Максимальный спред — 0.5%
+CANDLES_DAYS = 10                    # Период для расчета среднего оборота
 
 def quotation_to_float(q):
     if q is None:
@@ -45,20 +45,30 @@ def classify_trend(closes):
 def analyze_share(client, share):
     figi = share.figi
 
+    # ФИЛЬТР 1: Флаги доступности торговли и ликвидности от самого Т-Банка
+    if not share.api_trade_available_flag:
+        return None, "Нет доступа через API"
+    if not share.buy_available_flag or not share.sell_available_flag:
+        return None, "Покупка/продажа недоступна"
+    if not share.liquidity_flag:
+        return None, "Не помечена как ликвидная"
+
+    # ФИЛЬТР 2: Проверка спреда в реальном стакане
     try:
         ob = client.market_data.get_order_book(figi=figi, depth=1)
         if not ob.bids or not ob.asks:
-            return None, "Нет заявок в стакане"
+            return None, "Пустой стакан"
         best_bid = quotation_to_float(ob.bids[0].price)
         best_ask = quotation_to_float(ob.asks[0].price)
         if best_bid <= 0 or best_ask <= 0:
-            return None, "Нулевые цены в стакане"
+            return None, "Нулевые цены"
         spread_pct = (best_ask - best_bid) / best_bid * 100
         if spread_pct > MAX_SPREAD_PERCENT:
             return None, f"Спред {spread_pct:.2f}% > {MAX_SPREAD_PERCENT}%"
     except Exception as e:
         return None, f"Ошибка стакана: {e}"
 
+    # ФИЛЬТР 3: Проверка среднего дневного оборота в рублях
     try:
         candles_resp = client.market_data.get_candles(
             figi=figi,
@@ -84,7 +94,7 @@ def analyze_share(client, share):
 
     avg_turnover = sum(turnovers) / len(turnovers)
     if avg_turnover < MIN_DAILY_TURNOVER_RUB:
-        return None, f"Оборот {avg_turnover/1e6:.1f} млн < {MIN_DAILY_TURNOVER_RUB/1e6} млн"
+        return None, f"Оборот {avg_turnover/1e6:.1f} млн < 50 млн"
 
     avg_range = sum(ranges) / len(ranges) if ranges else 0
 
@@ -92,10 +102,10 @@ def analyze_share(client, share):
         "ticker": share.ticker,
         "figi": figi,
         "name": share.name,
-        "trade_method": "API" if share.api_trade_available_flag else "MANUAL",
-        "api_trade_available": share.api_trade_available_flag,
-        "buy_available": share.buy_available_flag,
-        "sell_available": share.sell_available_flag,
+        "trade_method": "API",
+        "api_trade_available": True,
+        "buy_available": True,
+        "sell_available": True,
         "lot": share.lot,
         "last_price": quotation_to_float(candles[-1].close),
         "avg_daily_turnover_rub": round(avg_turnover, 2),
@@ -124,20 +134,15 @@ def main():
             print(f"⚠️ Старый whitelist не прочитан: {e}")
 
     with Client(TOKEN, target=INVEST_GRPC_API) as client:
-        # Базовый список — только бумаги, доступные через API
         shares_resp = client.instruments.shares(
             instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE
         )
         shares = shares_resp.instruments
-        print(f"Всего акций (BASE): {len(shares)}")
+        print(f"Всего акций для проверки (BASE): {len(shares)}")
 
         results, skipped = [], 0
 
         for share in shares:
-            if not share.buy_available_flag or not share.sell_available_flag:
-                skipped += 1
-                continue
-
             analyzed, reason = analyze_share(client, share)
             if analyzed:
                 if share.ticker not in old_data:
@@ -146,8 +151,8 @@ def main():
             else:
                 skipped += 1
 
-        print(f"✅ Прошло фильтры: {len(results)}")
-        print(f"⛔ Отсеяно: {skipped}")
+        print(f"\n✅ Ликвидных акций прошло все фильтры: {len(results)}")
+        print(f"⛔ Отсеяно неликвидных: {skipped}")
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
