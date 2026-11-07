@@ -20,7 +20,11 @@ TOKEN = os.environ.get("T_INVEST_TOKEN")
 TG_TOKEN = os.environ.get("INVEST_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
 WHITELIST_PATH = "t_invest/data/scanner/whitelist.json"
-MODELS_DIR = "learn/models"
+
+# ПУТЬ К МОДЕЛЯМ ИЗМЕНЕН:
+MODELS_DIR = "t_invest/data/model"
+CUSTOM_MODELS_SRC = "learn/models" # Откуда берем код моделей
+
 HISTORY_DAYS = 365
 CHUNK_DAYS = 90
 TARGET_HORIZON = 1
@@ -108,11 +112,11 @@ def profit_factor(y_true, y_pred, returns):
 
 def load_models():
     models = {}
-    # Ищем только файлы, начинающиеся с model_
-    for filename in os.listdir(MODELS_DIR):
+    # Берем код моделей из папки learn/models
+    for filename in os.listdir(CUSTOM_MODELS_SRC):
         if filename.startswith("model_") and filename.endswith(".py"):
             module_name = filename[:-3]
-            file_path = os.path.join(MODELS_DIR, filename)
+            file_path = os.path.join(CUSTOM_MODELS_SRC, filename)
             
             spec = importlib.util.spec_from_file_location(module_name, file_path)
             module = importlib.util.module_from_spec(spec)
@@ -197,6 +201,7 @@ def main():
         send_telegram("⚠️ Турнир не дал результатов.")
         return
 
+    # СОХРАНЯЕМ В t_invest/data/model
     os.makedirs(MODELS_DIR, exist_ok=True)
     model_path = os.path.join(MODELS_DIR, "best_model.pkl")
     joblib.dump(best_model, model_path)
