@@ -1,7 +1,7 @@
 import os
-from t_tech.invest import Client, InvestApiTarget
+from t_tech.invest import Client
+from t_tech.invest.constants import INVEST_GRPC_API, INVEST_GRPC_API_SANDBOX
 
-# Берем оба ключа из секретов
 TOKEN_PROD = os.environ.get("T_INVEST_TOKEN")
 TOKEN_SANDBOX = os.environ.get("T_SANDBOX")
 
@@ -20,10 +20,10 @@ def check_token(token, target, name):
 
 def main():
     print("--- ПРОВЕРКА РЕАЛЬНОГО ТОКЕНА (PROD) ---")
-    check_token(TOKEN_PROD, InvestApiTarget.PROD, "REAL")
+    check_token(TOKEN_PROD, INVEST_GRPC_API, "REAL")
 
     print("\n--- ПРОВЕРКА ТОКЕНА ПЕСОЧНИЦЫ (SANDBOX) ---")
-    check_token(TOKEN_SANDBOX, InvestApiTarget.SANDBOX, "SANDBOX")
+    check_token(TOKEN_SANDBOX, INVEST_GRPC_API_SANDBOX, "SANDBOX")
 
 if __name__ == "__main__":
     main()
