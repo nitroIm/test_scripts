@@ -2,8 +2,8 @@ name: T-Invest Full Test
 
 on:
   workflow_dispatch: # Кнопка для ручного запуска
-  schedule:
-    - cron: '0 */6 * * *' # Запуск каждые 6 часов
+  # schedule:
+   # - cron: '0 */6 * * *' # Запуск каждые 6 часов
 
 jobs:
   run-bot:
