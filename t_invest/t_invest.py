@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta
-from tinkoff.invest import Client, CandleInterval, OrderDirection, OrderType
-from tinkoff.invest.utils import now
+from t_tech.invest import Client, CandleInterval
+from t_tech.invest.utils import now
 
 TOKEN = os.environ.get("T_INVEST_TOKEN")
 
@@ -32,7 +32,7 @@ def main():
             limits = client.operations.get_withdraw_limits(account_id=account_id)
             print(f"✅ Лимиты на вывод получены.")
 
-            # 5. История свечей
+            # 5. История свечей (Сбербанк)
             candles = client.get_all_candles(
                 figi="BBG004730N88",
                 from_=now() - timedelta(days=30),
