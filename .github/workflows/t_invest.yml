@@ -17,7 +17,7 @@ jobs:
 
       - name: Install dependencies
         env:
-          SSL_TBANK_VERIFY: 'True' # Включаем встроенный сертификат МинЦифры
+          SSL_TBANK_VERIFY: 'True'
         run: |
           python -m pip install --upgrade pip
           pip install t-tech-investments --index-url https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple --trusted-host opensource.tbank.ru
@@ -25,5 +25,6 @@ jobs:
       - name: Run script
         env:
           T_INVEST_TOKEN: ${{ secrets.T_INVEST_TOKEN }}
-          SSL_TBANK_VERIFY: 'True' # Дублируем для самого скрипта, чтобы не было ошибок при запросах
-        run: python t_invest.py
+          SSL_TBANK_VERIFY: 'True'
+        # Точный путь: папка t_invest и файл t_invest.py внутри неё
+        run: python t_invest/t_invest.py
