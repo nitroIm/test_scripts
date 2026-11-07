@@ -25,6 +25,6 @@ jobs:
       - name: Run script
         env:
           T_INVEST_TOKEN: ${{ secrets.T_INVEST_TOKEN }}
+          T_SANDBOX: ${{ secrets.T_SANDBOX }}
           SSL_TBANK_VERIFY: 'True'
-        # Точный путь: папка t_invest и файл t_invest.py внутри неё
         run: python t_invest/t_invest.py
