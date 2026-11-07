@@ -3,6 +3,7 @@
 # Файл: t_invest/learn/t_invest_learn.py
 
 import os
+import sys
 import json
 import joblib
 import numpy as np
@@ -111,7 +112,6 @@ def profit_factor(y_true, y_pred, returns):
 
 def load_models():
     models = {}
-    # Ищем файлы моделей в папке t_invest/learn/models
     if not os.path.exists(CUSTOM_MODELS_SRC):
         print(f"⚠️ Папка с моделями не найдена: {CUSTOM_MODELS_SRC}")
         return models
@@ -123,6 +123,9 @@ def load_models():
             
             spec = importlib.util.spec_from_file_location(module_name, file_path)
             module = importlib.util.module_from_spec(spec)
+            
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Регистрируем модуль в sys.modules, чтобы pickle его нашел
+            sys.modules[module_name] = module
             spec.loader.exec_module(module)
             
             if hasattr(module, "Model"):
@@ -204,9 +207,10 @@ def main():
         send_telegram("⚠️ Турнир не дал результатов.")
         return
 
-    # Сохраняем в t_invest/data/model
     os.makedirs(MODELS_DIR, exist_ok=True)
     model_path = os.path.join(MODELS_DIR, "best_model.pkl")
+    
+    # Сохраняем модель (теперь pickle сможет найти класс)
     joblib.dump(best_model, model_path)
 
     leaderboard = {
