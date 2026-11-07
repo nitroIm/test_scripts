@@ -16,17 +16,17 @@ TOKEN = os.environ.get("T_INVEST_TOKEN")
 # === НАСТРОЙКИ ФИЛЬТРОВ ===
 MIN_DAILY_TURNOVER_RUB = 50_000_000  # 50 млн рублей
 MAX_SPREAD_PERCENT = 0.5             # 0.5%
-CANDLES_DAYS = 10                    # дней истории для анализа
+CANDLES_DAYS = 10
 
 def quotation_to_float(q):
     if q is None:
         return 0.0
     return q.units + (q.nano / 1e9)
 
-def classify_volatility(avg_daily_range_pct):
-    if avg_daily_range_pct < 2.0:
+def classify_volatility(avg_range):
+    if avg_range < 2.0:
         return "LOW_VOL"
-    elif avg_daily_range_pct < 5.0:
+    elif avg_range < 5.0:
         return "MID_VOL"
     else:
         return "HIGH_VOL"
@@ -44,7 +44,6 @@ def classify_trend(closes):
 
 def analyze_share(client, share):
     figi = share.figi
-    ticker = share.ticker
 
     try:
         ob = client.market_data.get_order_book(figi=figi, depth=1)
@@ -73,16 +72,12 @@ def analyze_share(client, share):
     except Exception as e:
         return None, f"Ошибка свечей: {e}"
 
-    turnovers = []
-    ranges = []
-    closes = []
+    turnovers, ranges, closes = [], [], []
     for c in candles:
         close = quotation_to_float(c.close)
         high = quotation_to_float(c.high)
         low = quotation_to_float(c.low)
-        vol = c.volume
-        turnover_rub = vol * close
-        turnovers.append(turnover_rub)
+        turnovers.append(c.volume * close)
         if low > 0:
             ranges.append((high - low) / low * 100)
         closes.append(close)
@@ -92,11 +87,9 @@ def analyze_share(client, share):
         return None, f"Оборот {avg_turnover/1e6:.1f} млн < {MIN_DAILY_TURNOVER_RUB/1e6} млн"
 
     avg_range = sum(ranges) / len(ranges) if ranges else 0
-    vol_tag = classify_volatility(avg_range)
-    trend = classify_trend(closes)
 
-    result = {
-        "ticker": ticker,
+    return {
+        "ticker": share.ticker,
         "figi": figi,
         "name": share.name,
         "trade_method": "API" if share.api_trade_available_flag else "MANUAL",
@@ -108,12 +101,11 @@ def analyze_share(client, share):
         "avg_daily_turnover_rub": round(avg_turnover, 2),
         "spread_pct": round(spread_pct, 4),
         "avg_daily_range_pct": round(avg_range, 2),
-        "volatility_tag": vol_tag,
-        "trend": trend,
+        "volatility_tag": classify_volatility(avg_range),
+        "trend": classify_trend(closes),
         "is_new": False,
         "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    return result, None
+    }, None
 
 def main():
     if not TOKEN:
@@ -125,25 +117,23 @@ def main():
     if os.path.exists(output_path):
         try:
             with open(output_path, "r", encoding="utf-8") as f:
-                content = f.read()
+                content = f.read().strip()
                 if content:
-                    old_list = json.loads(content)
-                    old_data = {item["ticker"]: item for item in old_list}
+                    old_data = {item["ticker"]: item for item in json.loads(content)}
         except Exception as e:
-            print(f"⚠️ Не удалось прочитать старый whitelist: {e}")
+            print(f"⚠️ Старый whitelist не прочитан: {e}")
 
     with Client(TOKEN, target=INVEST_GRPC_API) as client:
+        # Базовый список — только бумаги, доступные через API
         shares_resp = client.instruments.shares(
-            instrument_status=InstrumentStatus.INSTRUMENT_STATUS_ALL
+            instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE
         )
         shares = shares_resp.instruments
-        print(f"Всего акций получено: {len(shares)}")
+        print(f"Всего акций (BASE): {len(shares)}")
 
-        results = []
-        skipped = 0
-        
+        results, skipped = [], 0
+
         for share in shares:
-            # Проверяем только флаги, которые гарантированно работают в API
             if not share.buy_available_flag or not share.sell_available_flag:
                 skipped += 1
                 continue
