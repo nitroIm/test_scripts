@@ -1,6 +1,6 @@
 # PROD CONTOUR ONLY
 # Python: 3.10
-# Файл: learn/t_invest_learn.py
+# Файл: t_invest/learn/t_invest_learn.py
 
 import os
 import json
@@ -21,9 +21,8 @@ TG_TOKEN = os.environ.get("INVEST_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
 WHITELIST_PATH = "t_invest/data/scanner/whitelist.json"
 
-# ПУТЬ К МОДЕЛЯМ ИЗМЕНЕН:
-MODELS_DIR = "t_invest/data/model"
-CUSTOM_MODELS_SRC = "learn/models" # Откуда берем код моделей
+MODELS_DIR = "t_invest/data/model"           # Куда сохраняем готовую модель
+CUSTOM_MODELS_SRC = "t_invest/learn/models"  # Откуда берем код моделей
 
 HISTORY_DAYS = 365
 CHUNK_DAYS = 90
@@ -112,7 +111,11 @@ def profit_factor(y_true, y_pred, returns):
 
 def load_models():
     models = {}
-    # Берем код моделей из папки learn/models
+    # Ищем файлы моделей в папке t_invest/learn/models
+    if not os.path.exists(CUSTOM_MODELS_SRC):
+        print(f"⚠️ Папка с моделями не найдена: {CUSTOM_MODELS_SRC}")
+        return models
+
     for filename in os.listdir(CUSTOM_MODELS_SRC):
         if filename.startswith("model_") and filename.endswith(".py"):
             module_name = filename[:-3]
@@ -201,7 +204,7 @@ def main():
         send_telegram("⚠️ Турнир не дал результатов.")
         return
 
-    # СОХРАНЯЕМ В t_invest/data/model
+    # Сохраняем в t_invest/data/model
     os.makedirs(MODELS_DIR, exist_ok=True)
     model_path = os.path.join(MODELS_DIR, "best_model.pkl")
     joblib.dump(best_model, model_path)
