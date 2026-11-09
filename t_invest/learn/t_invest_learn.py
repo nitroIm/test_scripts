@@ -3,7 +3,7 @@
 # Path: t_invest/learn/t_invest_learn.py
 # ============================================================
 
-import os, json, logging, importlib.util, requests, pandas as pd, numpy as np
+import os, json, logging, importlib.util, pandas as pd, numpy as np, time, subprocess
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from t_tech.invest import Client
@@ -11,14 +11,11 @@ from t_tech.invest.constants import INVEST_GRPC_API
 from t_tech.invest.schemas import CandleInterval
 from t_tech.invest.utils import now
 
-VERSION = "6.0-long-only"
+VERSION = "7.0-long-only-report-sep"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("t_invest.trainer")
 
 TOKEN = os.environ.get("T_INVEST_TOKEN")
-TG_TOKEN = os.environ.get("INVEST_BOT_TOKEN")
-TG_CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
-
 WHITELIST_PATH = "t_invest/data/scanner/whitelist.json"
 MODEL_OUT_FILE = Path("t_invest/data/model/best_params.json")
 MODELS_SRC_DIR = Path("t_invest/learn/models")
@@ -28,22 +25,12 @@ HISTORY_DAYS = 90
 
 MODEL_OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-def send_telegram(text):
-    if not TG_TOKEN or not TG_CHAT_ID: return
-    try:
-        url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-        requests.post(url, json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=10)
-    except Exception as e: log.error(f"Telegram error: {e}")
-
 def calculate_ema(s, p): return s.ewm(span=p, adjust=False).mean()
 def calculate_rsi(s, p=14):
-    d = s.diff()
-    g = (d.where(d > 0, 0)).rolling(window=p).mean()
-    l = (-d.where(d < 0, 0)).rolling(window=p).mean()
+    d = s.diff(); g = (d.where(d > 0, 0)).rolling(window=p).mean(); l = (-d.where(d < 0, 0)).rolling(window=p).mean()
     return 100 - (100 / (1 + g/l))
 def calculate_macd(s, f=12, sl=26, sig=9):
-    m = calculate_ema(s, f) - calculate_ema(s, sl)
-    return m - calculate_ema(m, sig)
+    m = calculate_ema(s, f) - calculate_ema(s, sl); return m - calculate_ema(m, sig)
 def calculate_atr(df, p=14):
     tr = pd.concat([df['high']-df['low'], (df['high']-df['close'].shift()).abs(), (df['low']-df['close'].shift()).abs()], axis=1).max(axis=1)
     return tr.rolling(window=p).mean()
@@ -80,11 +67,12 @@ def load_models():
     return models
 
 def main():
+    start_time = time.time()
     log.info(f"STARTING TRAINER v{VERSION}")
+    
     with open(WHITELIST_PATH, "r", encoding="utf-8") as f: data = json.load(f)
     stocks = data["data"] if isinstance(data, dict) and "data" in data else data
     
-    # Берем ТОП-5 по волатильности (без фильтра тренда)
     stocks.sort(key=lambda x: x.get("avg_daily_range_pct", 0), reverse=True)
     top_stocks = stocks[:TOP_N_STOCKS]
 
@@ -124,13 +112,17 @@ def main():
                 old_p = Path(best_model_data["model_path"]); new_p = MODEL_OUT_FILE.parent / f"best_{mode}_long.pkl"
                 if old_p.exists(): os.replace(old_p, new_p); best_model_data["model_path"] = str(new_p)
 
+    # Сохраняем статистику для отчета
+    out_data["stats"] = {
+        "total_rows": len(full_df),
+        "elapsed_seconds": int(time.time() - start_time)
+    }
+
     for pkl in MODEL_OUT_FILE.parent.glob("model_*.pkl"): pkl.unlink()
     with open(MODEL_OUT_FILE, "w", encoding="utf-8") as f: json.dump(out_data, f, ensure_ascii=False, indent=2)
     
-    msg = f"🏆 <b>Обучение (LONG ONLY) завершено</b>\n\n📈 Акции: {', '.join([s['ticker'] for s in top_stocks])}\n\n"
-    for mode in ["intraday", "swing"]:
-        res = out_data[mode]["long"]
-        if res: msg += f"<b>{mode.upper()} LONG</b>: {res['source']} (Score: {res['metrics']['score']})\n"
-    send_telegram(msg)
+    log.info("Starting report script...")
+    # Запускаем скрипт отчета
+    subprocess.run(["python", "t_invest/reports/t_invest_learn_report.py"], check=False)
 
 if __name__ == "__main__": main()
