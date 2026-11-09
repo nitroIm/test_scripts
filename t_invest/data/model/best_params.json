@@ -1,6 +1,6 @@
 {
-  "trainer_version": "6.0-long-only",
-  "updated_at": "2026-11-09T17:00:48.243154+00:00",
+  "trainer_version": "7.0-long-only-report-sep",
+  "updated_at": "2026-11-09T17:37:14.436768+00:00",
   "long_tickers": [
     "VKCO",
     "MVID",
@@ -11,41 +11,45 @@
   "intraday": {
     "long": {
       "params": {
-        "tp_pct": 2.0,
+        "tp_pct": 3.0,
         "sl_pct": 2.0,
         "time_exit_h": 24,
-        "model_type": "xgb"
+        "model_type": "catboost"
       },
       "metrics": {
-        "trades": 84,
-        "pnl": 6.25,
-        "winrate": 0.5952,
-        "max_dd": -2.63,
-        "score": 2.37,
-        "raw_score": 2.37
+        "trades": 76,
+        "pnl": 7.27,
+        "winrate": 0.5132,
+        "max_dd": -2.61,
+        "score": 2.78,
+        "raw_score": 2.78
       },
       "model_path": "t_invest/data/model/best_intraday_long.pkl",
-      "source": "model_xgb"
+      "source": "model_catboost"
     }
   },
   "swing": {
     "long": {
       "params": {
-        "tp_pct": 2.0,
+        "tp_pct": 3.0,
         "sl_pct": 2.0,
         "time_exit_h": 24,
-        "model_type": "xgb"
+        "model_type": "catboost"
       },
       "metrics": {
-        "trades": 84,
-        "pnl": 6.25,
-        "winrate": 0.5952,
-        "max_dd": -2.63,
-        "score": 2.37,
-        "raw_score": 2.37
+        "trades": 76,
+        "pnl": 7.27,
+        "winrate": 0.5132,
+        "max_dd": -2.61,
+        "score": 2.78,
+        "raw_score": 2.78
       },
       "model_path": "t_invest/data/model/best_swing_long.pkl",
-      "source": "model_xgb"
+      "source": "model_catboost"
     }
+  },
+  "stats": {
+    "total_rows": 7939,
+    "elapsed_seconds": 987
   }
 }
