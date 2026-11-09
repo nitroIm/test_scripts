@@ -7,36 +7,52 @@ POSITION_NOTIONAL = 20.0
 FEE_RATE = 0.0005
 MIN_TRADES_FOR_FULL_SCORE = 30
 
-# Урезанная сетка, чтобы не ждать по полчаса
+# Сетка теперь использует множители ATR и квантили RSI (динамика!)
 GRID_CUSTOM = {
-    "rsi_threshold": [25, 30, 35],
-    "vol_multiplier": [1.0, 1.2],
-    "tp_pct": [1.0, 2.0, 3.0],
-    "sl_pct": [0.5, 1.0, 2.0],
-    "time_exit_h": [4, 8, 12]
+    "rsi_quantile": [0.1, 0.2, 0.3],      # Динамический порог RSI (нижние 10%, 20% или 30% значений)
+    "vol_multiplier": [1.0, 1.5],         # Во сколько раз объем выше среднего
+    "tp_atr_mult": [1.5, 2.0, 3.0],       # Тейк-профит: 1.5, 2 или 3 * ATR
+    "sl_atr_mult": [0.5, 1.0, 1.5],       # Стоп-лосс: 0.5, 1 или 1.5 * ATR
+    "time_exit_h": [4, 8, 12]             # Выход по времени (часы)
 }
 
 def run_backtest_single(df, side, params):
     trades, in_pos, entry_price, entry_idx = [], False, 0.0, 0
+    tp_hit, sl_hit = 0.0, 0.0 # Динамические TP/SL для текущей сделки
+
     for i in range(1, len(df)):
         curr = df.iloc[i]
+        
         if in_pos:
             gross_pct = (curr['close'] - entry_price) / entry_price * 100.0 if side == "long" else (entry_price - curr['close']) / entry_price * 100.0
-            if gross_pct <= -params["sl_pct"] or gross_pct >= params["tp_pct"] or (i - entry_idx) >= params["time_exit_h"]:
+            if gross_pct <= -sl_hit or gross_pct >= tp_hit or (i - entry_idx) >= params["time_exit_h"]:
                 trades.append(POSITION_NOTIONAL * ((gross_pct - (FEE_RATE * 200)) / 100.0))
                 in_pos = False
         
         if not in_pos:
+            # Динамический RSI: смотрим, входит ли текущий RSI в нижние N% за последние 100 часов
+            rsi_window = df['rsi'].iloc[max(0, i-100):i]
+            rsi_threshold = rsi_window.quantile(params["rsi_quantile"]) if len(rsi_window) > 10 else 30
+            
             macd_cond = curr['macd_hist'] > 0 if side == "long" else curr['macd_hist'] < 0
             vol_cond = curr['volume'] > (curr['vol_sma'] * params["vol_multiplier"])
             
             if side == "long":
-                rsi_cond = curr['rsi'] < params["rsi_threshold"]
+                rsi_cond = curr['rsi'] < rsi_threshold
             else:
-                rsi_cond = curr['rsi'] > (100 - params["rsi_threshold"])
+                # Для шорта ищем верхние N% (перекупленность)
+                rsi_threshold_short = rsi_window.quantile(1 - params["rsi_quantile"]) if len(rsi_window) > 10 else 70
+                rsi_cond = curr['rsi'] > rsi_threshold_short
                 
             if rsi_cond and macd_cond and vol_cond:
-                in_pos, entry_price, entry_idx = True, curr['close'], i
+                in_pos = True
+                entry_price = curr['close']
+                entry_idx = i
+                # Считаем TP/SL в процентах на основе ATR в момент входа
+                atr_pct = (curr['atr_14'] / curr['close']) * 100.0
+                tp_hit = atr_pct * params["tp_atr_mult"]
+                sl_hit = atr_pct * params["sl_atr_mult"]
+                
     return trades
 
 def calculate_metrics(trades):
@@ -56,7 +72,7 @@ def calculate_metrics(trades):
 def train(df, side="long", mode="swing"):
     df = df.sort_values(['ticker', 'open_time']).reset_index(drop=True)
     
-    # 80% Train, 20% Test (Строго по времени, без перемешивания!)
+    # 80% Train, 20% Test
     split = int(len(df) * 0.8)
     train_df = df.iloc[:split]
     test_df = df.iloc[split:]
@@ -87,4 +103,4 @@ def train(df, side="long", mode="swing"):
     
     if not test_metrics: return None
     
-    return {"params": {**best_params, "model_type": "custom"}, "metrics": test_metrics}
+    return {"params": {**best_params, "model_type": "custom_dynamic"}, "metrics": test_metrics}
