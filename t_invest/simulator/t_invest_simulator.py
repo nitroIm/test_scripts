@@ -22,6 +22,7 @@ TG_TOKEN = os.environ.get("INVEST_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
 
 BEST_PARAMS_FILE = Path("t_invest/data/model/best_params.json")
+WHITELIST_FILE = Path("t_invest/data/scanner/whitelist.json")
 STATE_FILE = Path("t_invest/data/simulator/state.json")
 HISTORY_FILE = Path("t_invest/data/simulator/trade_history.json")
 
@@ -63,21 +64,29 @@ def fetch_h1_candles(client, figi, count=50):
         df = pd.DataFrame(rows)
         df['time'] = pd.to_datetime(df['time'], utc=True)
         return df
-    except: return pd.DataFrame()
+    except Exception as e:
+        log.error(f"Error fetching H1 {figi}: {e}")
+        return pd.DataFrame()
 
 def get_last_price(client, figi):
     try:
         resp = client.market_data.get_last_prices(figi=[figi])
         if resp.last_prices: return q2f(resp.last_prices[0].price)
-    except: pass
+    except Exception as e:
+        log.error(f"Error fetching last price {figi}: {e}")
     return 0.0
 
 def main():
     log.info("STARTING SIMULATOR")
-    if not BEST_PARAMS_FILE.exists():
-        log.error("best_params.json not found"); return
+    if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
+        log.error("best_params.json or whitelist.json not found"); return
 
     with open(BEST_PARAMS_FILE) as f: params_data = json.load(f)
+    with open(WHITELIST_FILE) as f: wl_data = json.load(f)
+    
+    # Создаем словарь тикер -> figi
+    wl_stocks = wl_data["data"] if isinstance(wl_data, dict) and "data" in wl_data else wl_data
+    figi_map = {s["ticker"]: s["figi"] for s in wl_stocks}
     
     mode = "intraday"
     side = "long"
@@ -102,29 +111,27 @@ def main():
 
     with Client(TOKEN, target=INVEST_GRPC_API_SANDBOX) as client:
         accounts = client.users.get_accounts()
-        if not accounts.accounts: return
+        if not accounts.accounts: 
+            log.error("No sandbox accounts")
+            return
         acc_id = accounts.accounts[0].id
 
         for ticker in tickers:
-            try:
-                shares = client.instruments.shares(instrument_status=1).instruments
-                share = next((s for s in shares if s.ticker == ticker), None)
-                if not share: continue
-                figi = share.figi
-            except: continue
+            figi = figi_map.get(ticker)
+            if not figi:
+                log.warning(f"Ticker {ticker} not found in whitelist")
+                continue
 
             current_price = get_last_price(client, figi)
             if current_price <= 0: continue
 
-            # === ЛОГИКА ВЫХОДА (Каждые 15 минут) ===
+            # === ЛОГИКА ВЫХОДА ===
             if ticker in state["positions"]:
                 pos = state["positions"][ticker]
                 
-                # Обновляем highest по текущей цене
                 if current_price > pos["highest"]:
                     pos["highest"] = current_price
                 
-                # Подтягиваем трейлинг-стоп (двигаем только вверх)
                 trail_dist_pct = p["sl_pct"] * 0.5
                 new_trail = pos["highest"] * (1 - trail_dist_pct / 100)
                 if new_trail > pos["trailing_stop"]:
@@ -144,27 +151,20 @@ def main():
                         )
                         pnl_pct = (current_price - pos["entry"]) / pos["entry"] * 100
                         
-                        # Логируем сделку
-                        history.append({
-                            "ticker": ticker, "type": "SELL", "price": round(current_price, 2),
-                            "time": now_time.isoformat(), "reason": exit_reason, "pnl_pct": round(pnl_pct, 2)
-                        })
-                        
-                        msg = f"🔴 <b>ПРОДАЖА {ticker}</b>\nПричина: {exit_reason}\nЦена: {current_price:.2f}₽ | PnL: {pnl_pct:.2f}%\nВремя: {current_klg} КЛГ"
-                        send_tg(msg)
+                        history.append({"ticker": ticker, "type": "SELL", "price": round(current_price, 2), "time": now_time.isoformat(), "reason": exit_reason, "pnl_pct": round(pnl_pct, 2)})
+                        send_tg(f"🔴 <b>ПРОДАЖА {ticker}</b>\nПричина: {exit_reason}\nЦена: {current_price:.2f}₽ | PnL: {pnl_pct:.2f}%\nВремя: {current_klg} КЛГ")
                         del state["positions"][ticker]
                     except Exception as e: log.error(f"Sell error {ticker}: {e}")
 
-            # === ЛОГИКА ВХОДА (Только по новой часовой свече) ===
+            # === ЛОГИКА ВХОДА ===
             if ticker not in state["positions"]:
                 df_h1 = fetch_h1_candles(client, figi)
                 if len(df_h1) < 30: continue
                 
                 last_candle_time = df_h1.iloc[-1]['time'].isoformat()
                 
-                # Проверяем, видели ли мы уже эту часовую свечу
                 if state["last_h1_candle"].get(ticker) == last_candle_time:
-                    continue # Свеча старая, сигнал уже проверяли
+                    continue 
                 
                 df_h1 = compute_features(df_h1).dropna()
                 if df_h1.empty: continue
@@ -181,7 +181,6 @@ def main():
                         signal = int(model.predict(X)[0])
                     except Exception as e: log.error(f"Pred error {ticker}: {e}")
                 
-                # Обновляем время последней обработанной свечи (чтобы не купить дважды)
                 state["last_h1_candle"][ticker] = last_candle_time
 
                 if signal == 1:
@@ -202,17 +201,10 @@ def main():
                             "exit_time": exit_time.isoformat(), "figi": figi
                         }
                         
-                        # Логируем сделку
-                        history.append({
-                            "ticker": ticker, "type": "BUY", "price": round(entry_price, 2),
-                            "time": now_time.isoformat(), "reason": "SIGNAL", "pnl_pct": 0.0
-                        })
-                        
-                        msg = f"🟢 <b>ПОКУПКА {ticker}</b>\nЦена: {entry_price:.2f}₽\nTP: {tp_price:.2f}₽ | SL: {sl_price:.2f}₽\nВремя: {current_klg} КЛГ"
-                        send_tg(msg)
+                        history.append({"ticker": ticker, "type": "BUY", "price": round(entry_price, 2), "time": now_time.isoformat(), "reason": "SIGNAL", "pnl_pct": 0.0})
+                        send_tg(f"🟢 <b>ПОКУПКА {ticker}</b>\nЦена: {entry_price:.2f}₽\nTP: {tp_price:.2f}₽ | SL: {sl_price:.2f}₽\nВремя: {current_klg} КЛГ")
                     except Exception as e: log.error(f"Buy error {ticker}: {e}")
 
-    # Сохраняем состояние и историю
     with open(STATE_FILE, "w") as f: json.dump(state, f, indent=2, default=str)
     with open(HISTORY_FILE, "w") as f: json.dump(history, f, indent=2, default=str)
     log.info("Simulator done.")
