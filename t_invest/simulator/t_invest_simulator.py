@@ -84,7 +84,6 @@ def main():
     with open(BEST_PARAMS_FILE) as f: params_data = json.load(f)
     with open(WHITELIST_FILE) as f: wl_data = json.load(f)
     
-    # Создаем словарь тикер -> figi
     wl_stocks = wl_data["data"] if isinstance(wl_data, dict) and "data" in wl_data else wl_data
     figi_map = {s["ticker"]: s["figi"] for s in wl_stocks}
     
@@ -111,10 +110,20 @@ def main():
 
     with Client(TOKEN, target=INVEST_GRPC_API_SANDBOX) as client:
         accounts = client.users.get_accounts()
+        
+        # === ИСПРАВЛЕНИЕ: Автосоздание счета в Sandbox ===
         if not accounts.accounts: 
-            log.error("No sandbox accounts")
-            return
-        acc_id = accounts.accounts[0].id
+            log.info("No sandbox accounts found. Creating a new one...")
+            try:
+                new_acc = client.sandbox.open_sandbox_account()
+                acc_id = new_acc.account_id
+                log.info(f"Created sandbox account: {acc_id}")
+            except Exception as e:
+                log.error(f"Failed to create sandbox account: {e}")
+                return
+        else:
+            acc_id = accounts.accounts[0].id
+            log.info(f"Using existing sandbox account: {acc_id}")
 
         for ticker in tickers:
             figi = figi_map.get(ticker)
