@@ -17,7 +17,7 @@ from t_tech.invest.constants import INVEST_GRPC_API
 from t_tech.invest.schemas import CandleInterval
 from t_tech.invest.utils import now
 
-VERSION = "3.1-long-short-cleanup"
+VERSION = "3.2-long-short-cleanup-fix"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("t_invest.trainer")
 
@@ -210,18 +210,18 @@ def main():
                     log.error(f"  ❌ Model {model_name} crashed on {mode}/{side}: {e}")
                     
             if best_model_data:
-                # ПЕРЕИМЕНОВЫВАЕМ МОДЕЛЬ ПОБЕДИТЕЛЯ
-                old_path = Path(best_model_data["model_path"])
-                new_path = MODEL_OUT_FILE.parent / f"best_{mode}_{side}.pkl"
-                
-                # Если модель сохранилась на диск, переносим её
-                if old_path.exists():
-                    os.replace(old_path, new_path)
-                    best_model_data["model_path"] = str(new_path)
-                    
                 out_data[mode][side] = best_model_data
+                
+                # ИСПРАВЛЕНИЕ: Переименовываем файл ТОЛЬКО если он есть (если это ML-модель, а не кастомная)
+                if "model_path" in best_model_data:
+                    old_path = Path(best_model_data["model_path"])
+                    new_path = MODEL_OUT_FILE.parent / f"best_{mode}_{side}.pkl"
+                    
+                    if old_path.exists():
+                        os.replace(old_path, new_path)
+                        best_model_data["model_path"] = str(new_path)
 
-    # ГЕНЕРАЛЬНАЯ УБОРКА: удаляем все временные файлы моделей, оставляем только best_*.pkl
+    # Генеральная уборка
     for pkl_file in MODEL_OUT_FILE.parent.glob("model_*.pkl"):
         pkl_file.unlink()
     
