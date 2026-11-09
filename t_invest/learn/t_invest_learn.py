@@ -1,5 +1,5 @@
 # ============================================================
-# T-INVEST - WEEKLY TRAINER ORCHESTRATOR (STOCKS) v2.0 (TOP-5 & FAST)
+# T-INVEST - TRAINER ORCHESTRATOR (LONG & SHORT SEPARATION + CLEANUP)
 # Path: t_invest/learn/t_invest_learn.py
 # ============================================================
 
@@ -17,7 +17,7 @@ from t_tech.invest.constants import INVEST_GRPC_API
 from t_tech.invest.schemas import CandleInterval
 from t_tech.invest.utils import now
 
-VERSION = "2.0-stocks-fast"
+VERSION = "3.1-long-short-cleanup"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("t_invest.trainer")
 
@@ -31,8 +31,8 @@ MODEL_OUT_FILE = Path("t_invest/data/model/best_params.json")
 MODELS_SRC_DIR = Path("t_invest/learn/models")
 
 # --- НАСТРОЙКИ ОБУЧЕНИЯ ---
-TOP_N_STOCKS = 5        # Берем только 5 самых волатильных
-HISTORY_DAYS = 90       # Берем 3 месяца истории для скорости
+TOP_N_STOCKS = 5        
+HISTORY_DAYS = 90       
 
 MODEL_OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -93,6 +93,24 @@ def fetch_data_from_tinvest(client, figi, days=HISTORY_DAYS):
     df['open_time'] = pd.to_datetime(df['open_time'], utc=True)
     return df
 
+def add_indicators(df):
+    df['rsi'] = calculate_rsi(df['close'], 14)
+    df['rsi_7'] = calculate_rsi(df['close'], 7)
+    df['rsi_21'] = calculate_rsi(df['close'], 21)
+    df['macd_hist'] = calculate_macd(df['close'], 12, 26, 9)
+    df['ema_50'] = calculate_ema(df['close'], 50)
+    df['ema_20'] = calculate_ema(df['close'], 20)
+    df['ema_200'] = calculate_ema(df['close'], 200)
+    df['vol_sma'] = df['volume'].rolling(window=20).mean()
+    df['atr_7'] = calculate_atr(df, 7)
+    df['atr_14'] = calculate_atr(df, 14)
+    df['atr_50'] = calculate_atr(df, 50)
+    df['atr_100'] = calculate_atr(df, 100)
+    df['price_change_1h'] = df['close'].pct_change(1)
+    df['price_change_4h'] = df['close'].pct_change(4)
+    df['price_change_24h'] = df['close'].pct_change(24)
+    return df.dropna()
+
 def load_models():
     models = []
     if not MODELS_SRC_DIR.exists(): return models
@@ -104,9 +122,6 @@ def load_models():
             spec.loader.exec_module(module)
             if hasattr(module, "train"):
                 models.append((model_name, module))
-                log.info(f"Loaded model: {model_name}")
-            else:
-                log.warning(f"Model {model_name} skipped: no 'train' function.")
         except Exception as e:
             log.error(f"Failed to load model {model_name}: {e}")
     return models
@@ -118,54 +133,43 @@ def main():
         log.error("No token or whitelist.json missing.")
         return
 
-    # 1. Читаем и сортируем акции по волатильности
     with open(WHITELIST_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
     stocks = data["data"] if isinstance(data, dict) and "data" in data else data
-    
-    # Сортируем по среднему дневному размаху (avg_daily_range_pct), убывание
     stocks.sort(key=lambda x: x.get("avg_daily_range_pct", 0), reverse=True)
-    top_stocks = stocks[:TOP_N_STOCKS]
+
+    long_candidates = [s for s in stocks if s.get("trend") in ["UP", "SIDEWAYS"]]
+    short_candidates = [s for s in stocks if s.get("trend") == "DOWN"]
+
+    top_long = long_candidates[:TOP_N_STOCKS] if long_candidates else stocks[:TOP_N_STOCKS]
+    top_short = short_candidates[:TOP_N_STOCKS] if short_candidates else stocks[:TOP_N_STOCKS]
+
+    log.info(f"TOP-{TOP_N_STOCKS} for LONG: {[s['ticker'] for s in top_long]}")
+    log.info(f"TOP-{TOP_N_STOCKS} for SHORT: {[s['ticker'] for s in top_short]}")
+
+    long_dfs = []
+    short_dfs = []
     
-    log.info(f"Selected TOP-{TOP_N_STOCKS} stocks for training: {[s['ticker'] for s in top_stocks]}")
-
-    all_dfs = []
     with Client(TOKEN, target=INVEST_GRPC_API) as client:
-        for s in top_stocks:
-            ticker, figi = s["ticker"], s["figi"]
-            df = fetch_data_from_tinvest(client, figi)
-            if df.empty: continue
+        for s in top_long:
+            df = fetch_data_from_tinvest(client, s["figi"])
+            if not df.empty:
+                df = add_indicators(df)
+                if len(df) > 100:
+                    df['ticker'] = s["ticker"]
+                    long_dfs.append(df)
+        for s in top_short:
+            if any(df['ticker'].iloc[0] == s["ticker"] for df in long_dfs):
+                continue
+            df = fetch_data_from_tinvest(client, s["figi"])
+            if not df.empty:
+                df = add_indicators(df)
+                if len(df) > 100:
+                    df['ticker'] = s["ticker"]
+                    short_dfs.append(df)
 
-            # Индикаторы
-            df['rsi'] = calculate_rsi(df['close'], 14)
-            df['rsi_7'] = calculate_rsi(df['close'], 7)
-            df['rsi_21'] = calculate_rsi(df['close'], 21)
-            df['macd_hist'] = calculate_macd(df['close'], 12, 26, 9)
-            df['ema_50'] = calculate_ema(df['close'], 50)
-            df['ema_20'] = calculate_ema(df['close'], 20)
-            df['ema_200'] = calculate_ema(df['close'], 200)
-            df['vol_sma'] = df['volume'].rolling(window=20).mean()
-            df['atr_7'] = calculate_atr(df, 7)
-            df['atr_14'] = calculate_atr(df, 14)
-            df['atr_50'] = calculate_atr(df, 50)
-            df['atr_100'] = calculate_atr(df, 100)
-            df['price_change_1h'] = df['close'].pct_change(1)
-            df['price_change_4h'] = df['close'].pct_change(4)
-            df['price_change_24h'] = df['close'].pct_change(24)
-            
-            df = df.dropna()
-            if len(df) > 100:
-                df['ticker'] = ticker
-                all_dfs.append(df)
-            log.info(f"Loaded {ticker}: {len(df)} rows")
-
-    if not all_dfs:
-        log.error("No data downloaded.")
-        return
-
-    # Склеиваем в один датафрейм
-    full_df = pd.concat(all_dfs).sort_values('open_time').reset_index(drop=True)
-    log.info(f"Data ready. Total rows: {len(full_df)}")
+    full_long_df = pd.concat(long_dfs).sort_values('open_time').reset_index(drop=True) if long_dfs else pd.DataFrame()
+    full_short_df = pd.concat(short_dfs).sort_values('open_time').reset_index(drop=True) if short_dfs else pd.DataFrame()
 
     models = load_models()
     if not models:
@@ -175,27 +179,28 @@ def main():
     out_data = {
         "trainer_version": VERSION,
         "updated_at": datetime.now(timezone.utc).isoformat(),
-        "selected_tickers": [s["ticker"] for s in top_stocks],
-        "total_rows": len(full_df),
+        "long_tickers": [s["ticker"] for s in top_long],
+        "short_tickers": [s["ticker"] for s in top_short],
         "intraday": {"long": None, "short": None},
         "swing": {"long": None, "short": None},
-        "all_scores": {}
     }
 
     for mode in ["intraday", "swing"]:
-        out_data["all_scores"][mode] = {}
         for side in ["long", "short"]:
             log.info(f"--- Searching best model for {mode.upper()} / {side.upper()} ---")
+            df_to_use = full_long_df if side == "long" else full_short_df
+            
+            if df_to_use.empty:
+                continue
+
             best_score = -99999
             best_model_data = None
-            model_scores = {}
 
             for model_name, module in models:
                 try:
-                    res = module.train(full_df, side=side, mode=mode)
+                    res = module.train(df_to_use, side=side, mode=mode)
                     if res and res.get("metrics"):
                         sc = res["metrics"].get("score", -99999)
-                        model_scores[model_name] = res["metrics"]
                         if sc > best_score:
                             best_score = sc
                             res["source"] = model_name
@@ -203,28 +208,42 @@ def main():
                             log.info(f"  🏆 New best: {model_name} (Score: {sc})")
                 except Exception as e:
                     log.error(f"  ❌ Model {model_name} crashed on {mode}/{side}: {e}")
-                    model_scores[model_name] = {"error": str(e)}
                     
             if best_model_data:
+                # ПЕРЕИМЕНОВЫВАЕМ МОДЕЛЬ ПОБЕДИТЕЛЯ
+                old_path = Path(best_model_data["model_path"])
+                new_path = MODEL_OUT_FILE.parent / f"best_{mode}_{side}.pkl"
+                
+                # Если модель сохранилась на диск, переносим её
+                if old_path.exists():
+                    os.replace(old_path, new_path)
+                    best_model_data["model_path"] = str(new_path)
+                    
                 out_data[mode][side] = best_model_data
-            out_data["all_scores"][mode][side] = model_scores
+
+    # ГЕНЕРАЛЬНАЯ УБОРКА: удаляем все временные файлы моделей, оставляем только best_*.pkl
+    for pkl_file in MODEL_OUT_FILE.parent.glob("model_*.pkl"):
+        pkl_file.unlink()
+    
+    log.info("🧹 Cleaned up temporary model files.")
 
     with open(MODEL_OUT_FILE, "w", encoding="utf-8") as f:
         json.dump(out_data, f, ensure_ascii=False, indent=2)
     log.info(f"💾 Saved to {MODEL_OUT_FILE}")
 
-    # Отчет в Телеграм
-    msg = f"🏆 <b>Обучение завершено (TOP-{TOP_N_STOCKS})</b>\n\n📊 Акции: {', '.join([s['ticker'] for s in top_stocks])}\n\n"
+    msg = f"🏆 <b>Обучение (Long/Short) завершено</b>\n\n"
+    msg += f"📈 <b>LONG:</b> {', '.join([s['ticker'] for s in top_long])}\n"
+    msg += f"📉 <b>SHORT:</b> {', '.join([s['ticker'] for s in top_short])}\n\n"
+    
     for mode in ["intraday", "swing"]:
         for side in ["long", "short"]:
             res = out_data[mode][side]
             if res:
                 msg += f"<b>{mode.upper()} {side.upper()}</b>: {res['source']} (Score: {res['metrics']['score']})\n"
             else:
-                msg += f"<b>{mode.upper()} {side.upper()}</b>: Нет результатов\n"
+                msg += f"<b>{mode.upper()} {side.upper()}</b>: Нет данных\n"
     
     send_telegram(msg)
-    log.info("Done.")
 
 if __name__ == "__main__":
     main()
