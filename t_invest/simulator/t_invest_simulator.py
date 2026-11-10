@@ -38,7 +38,6 @@ def send_tg(text):
 
 def q2f(q): return q.units + q.nano / 1e9
 
-# --- ИНДИКАТОРЫ ---
 def calc_ema(s, p): return s.ewm(span=p, adjust=False).mean()
 def calc_rsi(s, p=14):
     d = s.diff(); g = (d.where(d>0,0)).rolling(window=p).mean(); l = (-d.where(d<0,0)).rolling(window=p).mean()
@@ -106,7 +105,8 @@ def main():
         with open(HISTORY_FILE) as f: history = json.load(f)
     
     now_time = datetime.now(timezone.utc)
-    current_klg = now_time.astimezone(KLG_TZ).strftime("%H:%M")
+    current_klg = now_time.astimezone(KLG_TZ)
+    current_time_str = current_klg.strftime("%H:%M")
 
     # Загружаем модели
     models = {}
@@ -117,18 +117,19 @@ def main():
         p = cfg_swing["model_path"]
         if Path(p).exists(): models["swing"] = joblib.load(p)
 
-    # === СТАРТОВОЕ СООБЩЕНИЕ ===
-    modes_loaded = ", ".join([f"{m.upper()} ({params_data.get(m, {}).get('long', {}).get('source', '?')})" for m in models.keys()])
-    startup_msg = (
-        f"🚀 <b>СИМУЛЯТОР ЗАПУЩЕН</b>\n\n"
-        f"🕒 Время: {current_klg} КЛГ\n"
-        f"📊 Акции ({len(tickers)}): {', '.join(sorted(tickers))}\n"
-        f"🧠 Модели: {modes_loaded if modes_loaded else 'НЕТ'}\n"
-        f"📂 Открытых позиций: {len(state['positions'])}\n"
-        f"━━━━━━━━━━━━━━━━━━"
-    )
-    log.info(f"Startup. Models: {list(models.keys())}, Tickers: {len(tickers)}")
-    send_tg(startup_msg)
+    # === СТАРТОВОЕ СООБЩЕНИЕ (Только в 08:45) ===
+    # Проверяем, что время 08:45-08:50, чтобы не спамить каждые 15 минут
+    if current_time_str >= "08:45" and current_time_str <= "08:50":
+        modes_loaded = ", ".join([f"{m.upper()} ({params_data.get(m, {}).get('long', {}).get('source', '?')})" for m in models.keys()])
+        startup_msg = (
+            f"🚀 <b>СИМУЛЯТОР ЗАПУЩЕН</b>\n\n"
+            f"🕒 Время: {current_time_str} КЛГ\n"
+            f"📊 Акции ({len(tickers)}): {', '.join(sorted(tickers))}\n"
+            f"🧠 Модели: {modes_loaded if modes_loaded else 'НЕТ'}\n"
+            f"📂 Открытых позиций: {len(state['positions'])}\n"
+            f"━━━━━━━━━━━━━━━━━━"
+        )
+        send_tg(startup_msg)
 
     with Client(TOKEN, target=INVEST_GRPC_API_SANDBOX) as client:
         accounts = client.users.get_accounts()
@@ -197,7 +198,7 @@ def main():
                                 f"Причина: {exit_reason}\n"
                                 f"Вход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\n"
                                 f"PnL: {pnl_pct:+.2f}% ({pnl_rub:+.2f}₽)\n"
-                                f"Время: {current_klg} КЛГ"
+                                f"Время: {current_time_str} КЛГ"
                             )
                             del state["positions"][pos_key]
                         except Exception as e: log.error(f"Sell error {pos_key}: {e}")
@@ -254,7 +255,7 @@ def main():
                                 f"🛑 SL: {sl_price:.2f}₽ (-{cfg['params']['sl_pct']}%)\n"
                                 f"⏱ Выход по времени: {cfg['params']['time_exit_h']}ч\n"
                                 f"📊 Вероятность: {prob*100:.0f}%\n"
-                                f"Время: {current_klg} КЛГ"
+                                f"Время: {current_time_str} КЛГ"
                             )
                         except Exception as e: log.error(f"Buy error {pos_key}: {e}")
                     else:
