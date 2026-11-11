@@ -24,8 +24,6 @@ NEWS_SCORES_PATH = "t_invest/data/news/t_invest_news_scores.json"
 BOT_TOKEN = os.getenv("INVEST_BOT_TOKEN", "").strip()
 CHANNEL_ID = os.getenv("TG_T_INVEST_CHANNEL", "").strip()
 
-MSK = timezone(timedelta(hours=3))
-
 def load_json(path):
     if not os.path.exists(path):
         return None
@@ -44,8 +42,7 @@ def format_money(val):
     return f"{val} ₽"
 
 def get_sentiment_text(ticker, news_data):
-    """Возвращает текстовое описание сентимента и эмодзи"""
-    if not news_data or ticker not in news_data:
+    if not news_data:
         return "нейтр. ⚪️"
     
     score = 0.0
@@ -68,10 +65,9 @@ def get_sentiment_text(ticker, news_data):
         return f"нейтр. ⚪️ ({score:+.2f})"
 
 def create_bubble_chart(top_stocks):
-    """Рисует график с пузырями и возвращает BytesIO"""
     plt.style.use('dark_background')
     
-    fig, ax = plt.subplots(figsize=(10, 5), facecolor='#1a1a1a')
+    fig, ax = plt.subplots(figsize=(8, 6), facecolor='#1a1a1a')
     ax.set_facecolor('#1a1a1a')
 
     turnovers = [s['avg_daily_turnover_rub'] for s in top_stocks]
@@ -96,18 +92,18 @@ def create_bubble_chart(top_stocks):
         else:
             norm = 0.5
             
-        size = 3000 + norm * 5000
+        size = 4000 + norm * 8000 
 
         ax.scatter(i, 0, s=size, color=color, alpha=0.85, edgecolors='#ffffff', linewidth=2, zorder=1)
-        ax.text(i, 0, f"${ticker}", ha='center', va='center', fontweight='bold', fontsize=12, color='black', zorder=2)
-        ax.text(i, -0.55, f"{vol:.1f}%", ha='center', va='center', fontsize=12, color='#aaaaaa', zorder=2)
+        ax.text(i, 0, f"${ticker}", ha='center', va='center', fontweight='bold', fontsize=16, color='black', zorder=2)
+        ax.text(i, -0.65, f"{vol:.1f}%", ha='center', va='center', fontsize=16, color='#ffffff', fontweight='bold', zorder=2)
 
-    ax.set_title("Волатильность и объем (размер = оборот)", color='#ffffff', pad=20, fontsize=14)
+    ax.set_title("Волатильность и объем", color='#ffffff', pad=25, fontsize=18, fontweight='bold')
     
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xlim(-0.7, len(top_stocks) - 0.3)
-    ax.set_ylim(-1.0, 0.8)
+    ax.set_ylim(-1.2, 1.0) 
     
     for spine in ax.spines.values():
         spine.set_visible(False)
@@ -121,7 +117,7 @@ def create_bubble_chart(top_stocks):
 
 def main():
     if not BOT_TOKEN or not CHANNEL_ID:
-        log.error("Отсутствуют переменные окружения: INVEST_BOT_TOKEN или TG_T_INVEST_CHANNEL")
+        log.error("Отсутствуют переменные окружения.")
         sys.exit(1)
 
     whitelist_data = load_json(WHITELIST_PATH)
@@ -132,6 +128,7 @@ def main():
         log.error("Не удалось загрузить данные сканера или обучения.")
         sys.exit(1)
 
+    # Берем реальное количество акций из массива data
     all_stocks = whitelist_data.get("data", [])
     total_found = len(all_stocks)
     
@@ -142,12 +139,20 @@ def main():
         log.error("Не найдены данные по выбранным тикерам.")
         sys.exit(1)
 
+    # Берем имена моделей и их метрики (Score) БЕЗ ПЕРЕВОДА
     try:
-        intraday_model = best_params["intraday"]["long"].get("source", "ML")
-        swing_model = best_params["swing"]["long"].get("source", "ML")
+        intraday_data = best_params["intraday"]["long"]
+        intraday_model = intraday_data.get("source", "ML")
+        intraday_score = intraday_data.get("metrics", {}).get("score", 0.0)
+        
+        swing_data = best_params["swing"]["long"]
+        swing_model = swing_data.get("source", "ML")
+        swing_score = swing_data.get("metrics", {}).get("score", 0.0)
     except (KeyError, TypeError):
         intraday_model = "ML"
+        intraday_score = 0.0
         swing_model = "ML"
+        swing_score = 0.0
 
     text = (
         f"☀️ <b>Цели на сегодня</b>\n\n"
@@ -165,7 +170,9 @@ def main():
         )
 
     text += (
-        f"\n🤖 <b>Обучение завершено:</b> Модели {intraday_model} (Intraday) и {swing_model} (Swing).\n\n"
+        f"\n🤖 <b>Обучение завершено:</b>\n"
+        f"Intraday: {intraday_model} (Score: {intraday_score:.2f})\n"
+        f"Swing: {swing_model} (Score: {swing_score:.2f})\n\n"
         f"⚠️ <i>Не ИИР. Торговля — риск.</i>"
     )
 
