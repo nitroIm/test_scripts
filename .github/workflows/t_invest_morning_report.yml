@@ -1,0 +1,32 @@
+name: T-Invest Morning Report
+
+on:
+  workflow_dispatch: # Для ручного запуска
+  schedule:
+    # Запуск в 08:40 по Калининграду (UTC+2) с понедельника по пятницу.
+    # В GitHub Actions время указывается в UTC, поэтому 08:40 - 2 часа = 06:40 UTC.
+    - cron: '40 6 * * 1-5'
+
+jobs:
+  send-morning-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests==2.32.3 matplotlib==3.8.4
+
+      - name: Run Morning Report Script
+        env:
+          INVEST_BOT_TOKEN: ${{ secrets.INVEST_BOT_TOKEN }}
+          TG_T_INVEST_CHANNEL: ${{ secrets.TG_T_INVEST_CHANNEL }}
+        run: |
+          python t_invest/reports/bot_t_invest/t_invest_morning_report.py
