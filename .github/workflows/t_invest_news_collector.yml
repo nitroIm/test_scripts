@@ -25,13 +25,13 @@ jobs:
           SSL_TBANK_VERIFY: 'True'
         run: |
           python -m pip install --upgrade pip
-          # Обновляем версию до 1.51.0, где есть метод news()
+          # SDK не нужен для новостей, но оставим на случай других задач
           pip install t-tech-investments==1.51.0 --index-url https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple --trusted-host opensource.tbank.ru
+          pip install requests==2.32.3
 
       - name: Run news collector
         env:
           T_INVEST_TOKEN: ${{ secrets.T_INVEST_TOKEN }}
-          SSL_TBANK_VERIFY: 'True'
         run: python t_invest/news/t_invest_news_collector.py
 
       - name: Commit and push news
