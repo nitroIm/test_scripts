@@ -1,23 +1,30 @@
 # ============================================================
-# T-INVEST NEWS COLLECTOR (REST API VERSION)
+# T-INVEST NEWS COLLECTOR (DIRECT REST API)
 # Path: t_invest/news/t_invest_news_collector.py
 # ============================================================
 
 import os, json, logging, hashlib, requests
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+import urllib3
+
+# Отключаем предупреждения SSL (сертификат Минцифры)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("news_collector")
 
+# --- НАСТРОЙКИ ---
 TOKEN = os.environ.get("T_INVEST_TOKEN")
 WHITELIST_FILE = Path("t_invest/data/scanner/whitelist.json")
 NEWS_FILE = Path("t_invest/data/news/t_invest_news_collector.json")
 
-# REST-эндпоинт для получения новостей
+# Официальный REST-эндпоинт для получения новостей
 NEWS_URL = "https://invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/News"
 
+# Глубина запроса: 36 часов (захватываем вчерашний вечер и сегодняшнее утро)
 FETCH_HOURS = 36
+# Срок хранения: 30 дней
 STORE_DAYS = 30
 
 KLG_TZ = timezone(timedelta(hours=2))
@@ -55,7 +62,7 @@ def news_hash(title):
     return hashlib.md5(normalized.encode()).hexdigest()
 
 def main():
-    log.info("STARTING NEWS COLLECTOR (REST API)")
+    log.info("STARTING NEWS COLLECTOR (DIRECT REST)")
     if not TOKEN:
         log.error("T_INVEST_TOKEN not set")
         return
@@ -75,26 +82,26 @@ def main():
 
     new_items = []
 
-    # Прямой REST-запрос
     headers = {
         "Authorization": f"Bearer {TOKEN}",
         "Content-Type": "application/json",
     }
+    # Запрашиваем максимум 1000 новостей, как указано в документации
     payload = {"limit": 1000}
 
     try:
-        resp = requests.post(NEWS_URL, headers=headers, json=payload, timeout=30)
+        # verify=False — критически важно для работы с сертификатом T-Invest
+        resp = requests.post(NEWS_URL, headers=headers, json=payload, timeout=30, verify=False)
         resp.raise_for_status()
         data = resp.json()
         items = data.get("items", [])
         log.info(f"Received {len(items)} news items from REST API")
 
         for item in items:
-            # Тикеры, к которым относится новость
+            # Парсим тикеры из структуры instrumentId
             instruments = item.get("instrumentId", [])
             tickers_in_news = []
             for inst in instruments:
-                # В REST-ответе структура может быть { instrument: { ticker: ... } }
                 if "instrument" in inst:
                     tickers_in_news.append(inst["instrument"].get("ticker"))
                 elif "ticker" in inst:
@@ -114,10 +121,12 @@ def main():
             if pub_time < cutoff_fetch:
                 continue
 
+            # Дедупликация по ID
             news_id = item.get("id")
             if not news_id or news_id in existing_ids:
                 continue
 
+            # Дедупликация по заголовку
             title = item.get("title", "")
             h = news_hash(title)
             if h in existing_hashes:
@@ -146,7 +155,7 @@ def main():
     else:
         log.info("No new unique news items")
 
-    # Очистка старых записей
+    # Очистка старых записей (старше STORE_DAYS)
     cleaned = []
     removed = 0
     for item in existing:
