@@ -1,14 +1,11 @@
 # ============================================================
-# T-INVEST NEWS COLLECTOR
+# T-INVEST NEWS COLLECTOR (REST API VERSION)
 # Path: t_invest/news/t_invest_news_collector.py
 # ============================================================
 
-import os, json, logging, hashlib
+import os, json, logging, hashlib, requests
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from t_tech.invest import Client
-from t_tech.invest.constants import INVEST_GRPC_API
-from t_tech.invest.utils import now
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("news_collector")
@@ -16,6 +13,9 @@ log = logging.getLogger("news_collector")
 TOKEN = os.environ.get("T_INVEST_TOKEN")
 WHITELIST_FILE = Path("t_invest/data/scanner/whitelist.json")
 NEWS_FILE = Path("t_invest/data/news/t_invest_news_collector.json")
+
+# REST-эндпоинт для получения новостей
+NEWS_URL = "https://invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/News"
 
 FETCH_HOURS = 36
 STORE_DAYS = 30
@@ -55,7 +55,7 @@ def news_hash(title):
     return hashlib.md5(normalized.encode()).hexdigest()
 
 def main():
-    log.info("STARTING NEWS COLLECTOR")
+    log.info("STARTING NEWS COLLECTOR (REST API)")
     if not TOKEN:
         log.error("T_INVEST_TOKEN not set")
         return
@@ -75,48 +75,70 @@ def main():
 
     new_items = []
 
-    with Client(TOKEN, target=INVEST_GRPC_API) as client:
-        try:
-            # Метод news() доступен в t-tech-investments >= 1.51.0
-            response = client.instruments.news(limit=1000)
-            items = response.items
-            log.info(f"Received {len(items)} news items from API")
+    # Прямой REST-запрос
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json",
+    }
+    payload = {"limit": 1000}
 
-            for item in items:
-                tickers_in_news = [inst.ticker for inst in item.instrument_id]
-                matching = set(tickers_in_news) & tickers
-                if not matching:
-                    continue
+    try:
+        resp = requests.post(NEWS_URL, headers=headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        items = data.get("items", [])
+        log.info(f"Received {len(items)} news items from REST API")
 
-                pub_time = item.ts
-                if pub_time.tzinfo is None:
-                    pub_time = pub_time.replace(tzinfo=timezone.utc)
-                if pub_time < cutoff_fetch:
-                    continue
+        for item in items:
+            # Тикеры, к которым относится новость
+            instruments = item.get("instrumentId", [])
+            tickers_in_news = []
+            for inst in instruments:
+                # В REST-ответе структура может быть { instrument: { ticker: ... } }
+                if "instrument" in inst:
+                    tickers_in_news.append(inst["instrument"].get("ticker"))
+                elif "ticker" in inst:
+                    tickers_in_news.append(inst["ticker"])
+            
+            matching = set(tickers_in_news) & tickers
+            if not matching:
+                continue
 
-                if item.id in existing_ids:
-                    continue
+            # Время публикации (ISO-строка в поле ts)
+            ts_str = item.get("ts")
+            if not ts_str:
+                continue
+            pub_time = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            if pub_time.tzinfo is None:
+                pub_time = pub_time.replace(tzinfo=timezone.utc)
+            if pub_time < cutoff_fetch:
+                continue
 
-                h = news_hash(item.title)
-                if h in existing_hashes:
-                    continue
+            news_id = item.get("id")
+            if not news_id or news_id in existing_ids:
+                continue
 
-                record = {
-                    "id": item.id,
-                    "tickers": list(matching),
-                    "title": item.title,
-                    "content": item.content[:500] if item.content else "",
-                    "source": item.source,
-                    "ts": pub_time.isoformat(),
-                    "hash": h,
-                }
-                new_items.append(record)
-                existing_ids.add(item.id)
-                existing_hashes.add(h)
+            title = item.get("title", "")
+            h = news_hash(title)
+            if h in existing_hashes:
+                continue
 
-        except Exception as e:
-            log.error(f"Error fetching news: {e}")
-            return
+            record = {
+                "id": news_id,
+                "tickers": list(matching),
+                "title": title,
+                "content": item.get("content", "")[:500],
+                "source": item.get("source", ""),
+                "ts": pub_time.isoformat(),
+                "hash": h,
+            }
+            new_items.append(record)
+            existing_ids.add(news_id)
+            existing_hashes.add(h)
+
+    except Exception as e:
+        log.error(f"Error fetching news via REST: {e}")
+        return
 
     if new_items:
         log.info(f"New unique news items: {len(new_items)}")
@@ -124,6 +146,7 @@ def main():
     else:
         log.info("No new unique news items")
 
+    # Очистка старых записей
     cleaned = []
     removed = 0
     for item in existing:
