@@ -42,20 +42,25 @@ def format_money(val):
     return f"{val} ₽"
 
 def get_sentiment_text(ticker, news_data):
-    if not news_data:
-        return "нейтр. ⚪️"
-    
+    """Железобетонный парсер сентимента. Всегда возвращает число."""
     score = 0.0
     if isinstance(news_data, dict):
-        if "data" in news_data and isinstance(news_data["data"], dict) and ticker in news_data["data"]:
-            score = news_data["data"][ticker]
-        elif ticker in news_data:
-            score = news_data[ticker]
-    
-    try:
-        score = float(score)
-    except (ValueError, TypeError):
-        return "нейтр. ⚪️"
+        try:
+            # Проверяем вложенную структуру {"data": {"SMLT": 0.5}}
+            if "data" in news_data and isinstance(news_data["data"], dict):
+                val = news_data["data"].get(ticker, 0.0)
+            # Проверяем плоскую структуру {"SMLT": 0.5}
+            else:
+                val = news_data.get(ticker, 0.0)
+            
+            # Если вдруг значение - это словарь типа {"score": 0.5}
+            if isinstance(val, dict):
+                val = val.get("score", 0.0)
+                
+            # Насильно приводим к float. Если там null или текст - будет 0.0
+            score = float(val) if val is not None else 0.0
+        except (ValueError, TypeError):
+            score = 0.0
 
     if score > 0.15:
         return f"позит. 🟢 ({score:+.2f})"
@@ -80,13 +85,12 @@ def create_bubble_chart(top_stocks):
         trend = stock.get('trend', 'SIDEWAYS')
         vol = stock.get('avg_daily_range_pct', 0)
 
-        # Цвет по тренду
         if trend == "UP":
-            color = '#00C853' # Зеленый
+            color = '#00C853'
         elif trend == "DOWN":
-            color = '#D50000' # Красный
+            color = '#D50000'
         else:
-            color = '#FFD600' # Желтый
+            color = '#FFD600'
 
         if max_turnover > min_turnover:
             norm = (math.log(turnover + 1) - math.log(min_turnover + 1)) / (math.log(max_turnover + 1) - math.log(min_turnover + 1))
@@ -96,8 +100,6 @@ def create_bubble_chart(top_stocks):
         size = 4000 + norm * 8000 
 
         ax.scatter(i, 0, s=size, color=color, alpha=0.85, edgecolors='#ffffff', linewidth=2, zorder=1)
-        
-        # Убрали знак доллара здесь
         ax.text(i, 0, ticker, ha='center', va='center', fontweight='bold', fontsize=16, color='black', zorder=2)
         ax.text(i, -0.65, f"{vol:.1f}%", ha='center', va='center', fontsize=16, color='#ffffff', fontweight='bold', zorder=2)
 
@@ -164,7 +166,6 @@ def main():
 
     for i, stock in enumerate(top_stocks, 1):
         sent_text = get_sentiment_text(stock['ticker'], news_data)
-        # Убрали знак доллара здесь
         text += (
             f"{i}. <b>{stock['ticker']}</b> — Волатильность {stock['avg_daily_range_pct']:.1f}% | "
             f"Оборот {format_money(stock['avg_daily_turnover_rub'])}\n"
