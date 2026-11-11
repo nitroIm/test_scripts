@@ -1,5 +1,5 @@
 # ============================================================
-# T-INVEST - SIMULATOR (SANDBOX) DAILY TRADING (BOTH MODES)
+# T-INVEST - SIMULATOR (SANDBOX) WITH NEWS FILTER & BOTH MODES
 # Path: t_invest/simulator/t_invest_simulator.py
 # ============================================================
 
@@ -25,11 +25,15 @@ BEST_PARAMS_FILE = Path("t_invest/data/model/best_params.json")
 WHITELIST_FILE = Path("t_invest/data/scanner/whitelist.json")
 STATE_FILE = Path("t_invest/data/simulator/state.json")
 HISTORY_FILE = Path("t_invest/data/simulator/trade_history.json")
+NEWS_SCORES_FILE = Path("t_invest/data/news/t_invest_news_scores.json")
 
 FEATURE_COLS = ["open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_21", "macd_hist", "ema_20", "ema_50", "ema_200", "vol_sma", "atr_7", "atr_14", "atr_50", "atr_100", "price_change_1h", "price_change_4h", "price_change_24h"]
 
-# МЯГКИЙ ПОРОГ: покупаем, если вероятность роста >= 40%
-MIN_PROBABILITY = 0.40
+# АГРЕССИВНЫЙ ПОРОГ ДЛЯ ВХОДА
+MIN_PROBABILITY = 0.35
+
+# БЛОКИРУЕМ ТОЛЬКО СИЛЬНЫЙ НЕГАТИВ
+NEWS_BLOCK_THRESHOLD = -0.5 
 
 KLG_TZ = timezone(timedelta(hours=2))
 
@@ -78,8 +82,19 @@ def get_last_price(client, figi):
         log.error(f"Error fetching last price {figi}: {e}")
     return 0.0
 
+def load_news_scores():
+    if not NEWS_SCORES_FILE.exists():
+        log.warning("News scores file not found. Trading without news filter.")
+        return {}
+    try:
+        with open(NEWS_SCORES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        log.error(f"Error loading news scores: {e}")
+        return {}
+
 def main():
-    log.info("STARTING SIMULATOR")
+    log.info("STARTING SIMULATOR (WITH NEWS FILTER)")
     if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
         log.error("best_params.json or whitelist.json not found"); return
 
@@ -107,10 +122,11 @@ def main():
     if HISTORY_FILE.exists():
         with open(HISTORY_FILE) as f: history = json.load(f)
     
+    news_scores = load_news_scores()
+
     now_time = datetime.now(timezone.utc)
     current_klg = now_time.astimezone(KLG_TZ).strftime("%H:%M")
 
-    # Загружаем модели
     models = {}
     if cfg_intraday and cfg_intraday.get("model_path"):
         p = cfg_intraday["model_path"]
@@ -119,10 +135,9 @@ def main():
         p = cfg_swing["model_path"]
         if Path(p).exists(): models["swing"] = joblib.load(p)
 
-    # Стартовое сообщение (только в 08:45)
     if "08:45" <= current_klg <= "08:50":
         modes = ", ".join(models.keys())
-        send_tg(f"🚀 <b>СИМУЛЯТОР ЗАПУЩЕН</b>\nМодели: {modes}\nАкции: {len(tickers)}\nОткрытых позиций: {len(state['positions'])}")
+        send_tg(f"🚀 <b>СИМУЛЯТОР ЗАПУЩЕН</b>\nМодели: {modes}\nАкции: {len(tickers)}\nПорог вероятности: {MIN_PROBABILITY*100:.0f}%\nНовостной фильтр: ВКЛ (порог {NEWS_BLOCK_THRESHOLD})")
 
     with Client(TOKEN, target=INVEST_GRPC_API_SANDBOX) as client:
         accounts = client.users.get_accounts()
@@ -158,7 +173,6 @@ def main():
                 # === ВЫХОД ===
                 if pos_key in state["positions"]:
                     pos = state["positions"][pos_key]
-                    
                     if current_price > pos["highest"]: pos["highest"] = current_price
                     
                     trail_dist_pct = cfg["params"]["sl_pct"] * 0.5
@@ -208,8 +222,18 @@ def main():
 
                     state["last_h1_candle"][pos_key] = last_candle_time
                     
+                    # ЛОГИРУЕМ ВЕРОЯТНОСТЬ ВСЕГДА
+                    news_data = news_scores.get(ticker, {})
+                    news_score = news_data.get("score", 0.0)
+                    log.info(f"{pos_key}: prob={prob:.2f}, news={news_score}")
+
                     if signal == 1:
-                        log.info(f"{pos_key} SIGNAL! Prob: {prob:.2f}. Buying...")
+                        if news_score < NEWS_BLOCK_THRESHOLD:
+                            log.info(f"{pos_key} SIGNAL! Но новости плохие ({news_score}). Пропуск.")
+                            send_tg(f"⚠️ <b>ОТМЕНА ПОКУПКИ {ticker} ({mode.upper()})</b>\nТехсигнал есть, но новостной фон негативный (Скор: {news_score}).")
+                            continue
+                        
+                        log.info(f"{pos_key} SIGNAL! Buying...")
                         try:
                             client.sandbox.post_sandbox_order(figi=figi, quantity=1, direction=OrderDirection.ORDER_DIRECTION_BUY, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
                             entry_price = current_price
@@ -224,11 +248,8 @@ def main():
                                 "exit_time": exit_time.isoformat(), "figi": figi
                             }
                             history.append({"ticker": ticker, "mode": mode, "type": "BUY", "price": round(entry_price, 2), "time": now_time.isoformat(), "reason": "SIGNAL", "pnl_pct": 0.0})
-                            send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nTP: {tp_price:.2f}₽ (+{cfg['params']['tp_pct']}%)\nSL: {sl_price:.2f}₽ (-{cfg['params']['sl_pct']}%)\nВероятность: {prob*100:.0f}%\nВремя: {current_klg} КЛГ")
+                            send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nTP: {tp_price:.2f}₽ (+{cfg['params']['tp_pct']}%)\nSL: {sl_price:.2f}₽ (-{cfg['params']['sl_pct']}%)\nВероятность: {prob*100:.0f}%\nНовости: {news_score}\nВремя: {current_klg} КЛГ")
                         except Exception as e: log.error(f"Buy error {pos_key}: {e}")
-                    else:
-                        if model is not None:
-                            log.info(f"{pos_key}: prob={prob:.2f} (ниже порога {MIN_PROBABILITY})")
 
     with open(STATE_FILE, "w") as f: json.dump(state, f, indent=2, default=str)
     with open(HISTORY_FILE, "w") as f: json.dump(history, f, indent=2, default=str)
