@@ -1,122 +1,57 @@
 {
   "GAZP": {
     "score": 1.0,
-    "news_count": 8,
-    "updated_at": "2026-11-11T15:07:56.444249+00:00"
+    "news_count": 6,
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   },
   "VTBR": {
     "score": 1.0,
-    "news_count": 6,
-    "updated_at": "2026-11-11T15:07:56.444259+00:00"
+    "news_count": 4,
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   },
   "T": {
     "score": 1.0,
-    "news_count": 5,
-    "updated_at": "2026-11-11T15:07:56.444261+00:00"
+    "news_count": 4,
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   },
   "POSI": {
     "score": 1.0,
-    "news_count": 3,
-    "updated_at": "2026-11-11T15:07:56.444263+00:00"
+    "news_count": 2,
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   },
   "SBER": {
-    "score": 0.81,
-    "news_count": 8,
-    "updated_at": "2026-11-11T15:07:56.444264+00:00"
+    "score": 1.0,
+    "news_count": 6,
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   },
   "PHOR": {
-    "score": -0.25,
-    "news_count": 2,
-    "updated_at": "2026-11-11T15:07:56.444266+00:00"
-  },
-  "WUSH": {
-    "score": -1.0,
+    "score": 0.25,
     "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444268+00:00"
-  },
-  "TATN": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444269+00:00"
-  },
-  "VKCO": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444271+00:00"
-  },
-  "SFIN": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444272+00:00"
-  },
-  "MAGN": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444273+00:00"
-  },
-  "CHMF": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444275+00:00"
-  },
-  "AFLT": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444276+00:00"
-  },
-  "GMKN": {
-    "score": 0.0,
-    "news_count": 2,
-    "updated_at": "2026-11-11T15:07:56.444278+00:00"
-  },
-  "NVTK": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444279+00:00"
-  },
-  "PLZL": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444281+00:00"
-  },
-  "LKOH": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444282+00:00"
-  },
-  "ROSN": {
-    "score": -1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444283+00:00"
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   },
   "YDEX": {
-    "score": 0.0,
-    "news_count": 2,
-    "updated_at": "2026-11-11T15:07:56.444285+00:00"
-  },
-  "ALRS": {
-    "score": -1.0,
+    "score": 0.5,
     "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444286+00:00"
-  },
-  "SELG": {
-    "score": 1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444287+00:00"
-  },
-  "DOMRF": {
-    "score": 1.0,
-    "news_count": 2,
-    "updated_at": "2026-11-11T15:07:56.444289+00:00"
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   },
   "SBERP": {
     "score": -1.0,
     "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444290+00:00"
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
+  },
+  "DOMRF": {
+    "score": 1.0,
+    "news_count": 1,
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   },
   "SMLT": {
     "score": 1.0,
     "news_count": 1,
-    "updated_at": "2026-11-11T15:07:56.444292+00:00"
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
+  },
+  "_MARKET_": {
+    "score": 0.0,
+    "news_count": 2,
+    "updated_at": "2026-11-11T15:16:01.352403+00:00"
   }
 }
