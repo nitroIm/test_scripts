@@ -13,14 +13,11 @@ from t_tech.invest.utils import now
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("news_collector")
 
-# --- НАСТРОЙКИ ---
 TOKEN = os.environ.get("T_INVEST_TOKEN")
 WHITELIST_FILE = Path("t_invest/data/scanner/whitelist.json")
 NEWS_FILE = Path("t_invest/data/news/t_invest_news_collector.json")
 
-# Глубина запроса: 36 часов
 FETCH_HOURS = 36
-# Срок хранения: 30 дней
 STORE_DAYS = 30
 
 KLG_TZ = timezone(timedelta(hours=2))
@@ -54,7 +51,6 @@ def save_news(news_list):
     log.info(f"Saved {len(news_list)} news items to {NEWS_FILE}")
 
 def news_hash(title):
-    """Стабильный хеш заголовка для дедупликации"""
     normalized = title.lower().strip()
     return hashlib.md5(normalized.encode()).hexdigest()
 
@@ -81,35 +77,30 @@ def main():
 
     with Client(TOKEN, target=INVEST_GRPC_API) as client:
         try:
-            # Запрашиваем новости (limit=1000 — максимум)
+            # Метод news() доступен в t-tech-investments >= 1.51.0
             response = client.instruments.news(limit=1000)
             items = response.items
             log.info(f"Received {len(items)} news items from API")
 
             for item in items:
-                # Проверяем, относится ли новость к нашим тикерам
                 tickers_in_news = [inst.ticker for inst in item.instrument_id]
                 matching = set(tickers_in_news) & tickers
                 if not matching:
                     continue
 
-                # Проверяем время публикации
                 pub_time = item.ts
                 if pub_time.tzinfo is None:
                     pub_time = pub_time.replace(tzinfo=timezone.utc)
                 if pub_time < cutoff_fetch:
                     continue
 
-                # Дедупликация по ID
                 if item.id in existing_ids:
                     continue
 
-                # Дедупликация по заголовку
                 h = news_hash(item.title)
                 if h in existing_hashes:
                     continue
 
-                # Формируем запись
                 record = {
                     "id": item.id,
                     "tickers": list(matching),
@@ -133,7 +124,6 @@ def main():
     else:
         log.info("No new unique news items")
 
-    # Очистка старых записей (старше STORE_DAYS)
     cleaned = []
     removed = 0
     for item in existing:
@@ -146,7 +136,7 @@ def main():
             else:
                 removed += 1
         except Exception:
-            cleaned.append(item)  # оставляем, если не смогли распарсить
+            cleaned.append(item)
 
     if removed:
         log.info(f"Removed {removed} old news items")
