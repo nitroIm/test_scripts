@@ -80,12 +80,13 @@ def create_bubble_chart(top_stocks):
         trend = stock.get('trend', 'SIDEWAYS')
         vol = stock.get('avg_daily_range_pct', 0)
 
+        # Цвет по тренду
         if trend == "UP":
-            color = '#00C853'
+            color = '#00C853' # Зеленый
         elif trend == "DOWN":
-            color = '#D50000'
+            color = '#D50000' # Красный
         else:
-            color = '#FFD600'
+            color = '#FFD600' # Желтый
 
         if max_turnover > min_turnover:
             norm = (math.log(turnover + 1) - math.log(min_turnover + 1)) / (math.log(max_turnover + 1) - math.log(min_turnover + 1))
@@ -95,7 +96,9 @@ def create_bubble_chart(top_stocks):
         size = 4000 + norm * 8000 
 
         ax.scatter(i, 0, s=size, color=color, alpha=0.85, edgecolors='#ffffff', linewidth=2, zorder=1)
-        ax.text(i, 0, f"${ticker}", ha='center', va='center', fontweight='bold', fontsize=16, color='black', zorder=2)
+        
+        # Убрали знак доллара здесь
+        ax.text(i, 0, ticker, ha='center', va='center', fontweight='bold', fontsize=16, color='black', zorder=2)
         ax.text(i, -0.65, f"{vol:.1f}%", ha='center', va='center', fontsize=16, color='#ffffff', fontweight='bold', zorder=2)
 
     ax.set_title("Волатильность и объем", color='#ffffff', pad=25, fontsize=18, fontweight='bold')
@@ -128,7 +131,6 @@ def main():
         log.error("Не удалось загрузить данные сканера или обучения.")
         sys.exit(1)
 
-    # Берем реальное количество акций из массива data
     all_stocks = whitelist_data.get("data", [])
     total_found = len(all_stocks)
     
@@ -139,7 +141,6 @@ def main():
         log.error("Не найдены данные по выбранным тикерам.")
         sys.exit(1)
 
-    # Берем имена моделей и их метрики (Score) БЕЗ ПЕРЕВОДА
     try:
         intraday_data = best_params["intraday"]["long"]
         intraday_model = intraday_data.get("source", "ML")
@@ -163,8 +164,9 @@ def main():
 
     for i, stock in enumerate(top_stocks, 1):
         sent_text = get_sentiment_text(stock['ticker'], news_data)
+        # Убрали знак доллара здесь
         text += (
-            f"{i}. <b>${stock['ticker']}</b> — Волатильность {stock['avg_daily_range_pct']:.1f}% | "
+            f"{i}. <b>{stock['ticker']}</b> — Волатильность {stock['avg_daily_range_pct']:.1f}% | "
             f"Оборот {format_money(stock['avg_daily_turnover_rub'])}\n"
             f"📰 Фон: {sent_text}\n"
         )
