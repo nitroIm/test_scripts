@@ -1,5 +1,5 @@
 # ============================================================
-# T-INVEST - SIMULATOR (SANDBOX) WITH TRAILING STOP & BOTH MODES
+# T-INVEST - SIMULATOR (SANDBOX) DAILY TRADING (BOTH MODES)
 # Path: t_invest/simulator/t_invest_simulator.py
 # ============================================================
 
@@ -27,6 +27,9 @@ STATE_FILE = Path("t_invest/data/simulator/state.json")
 HISTORY_FILE = Path("t_invest/data/simulator/trade_history.json")
 
 FEATURE_COLS = ["open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_21", "macd_hist", "ema_20", "ema_50", "ema_200", "vol_sma", "atr_7", "atr_14", "atr_50", "atr_100", "price_change_1h", "price_change_4h", "price_change_24h"]
+
+# МЯГКИЙ ПОРОГ: покупаем, если вероятность роста >= 40%
+MIN_PROBABILITY = 0.40
 
 KLG_TZ = timezone(timedelta(hours=2))
 
@@ -105,8 +108,7 @@ def main():
         with open(HISTORY_FILE) as f: history = json.load(f)
     
     now_time = datetime.now(timezone.utc)
-    current_klg = now_time.astimezone(KLG_TZ)
-    current_time_str = current_klg.strftime("%H:%M")
+    current_klg = now_time.astimezone(KLG_TZ).strftime("%H:%M")
 
     # Загружаем модели
     models = {}
@@ -117,24 +119,14 @@ def main():
         p = cfg_swing["model_path"]
         if Path(p).exists(): models["swing"] = joblib.load(p)
 
-    # === СТАРТОВОЕ СООБЩЕНИЕ (Только в 08:45) ===
-    # Проверяем, что время 08:45-08:50, чтобы не спамить каждые 15 минут
-    if current_time_str >= "08:45" and current_time_str <= "08:50":
-        modes_loaded = ", ".join([f"{m.upper()} ({params_data.get(m, {}).get('long', {}).get('source', '?')})" for m in models.keys()])
-        startup_msg = (
-            f"🚀 <b>СИМУЛЯТОР ЗАПУЩЕН</b>\n\n"
-            f"🕒 Время: {current_time_str} КЛГ\n"
-            f"📊 Акции ({len(tickers)}): {', '.join(sorted(tickers))}\n"
-            f"🧠 Модели: {modes_loaded if modes_loaded else 'НЕТ'}\n"
-            f"📂 Открытых позиций: {len(state['positions'])}\n"
-            f"━━━━━━━━━━━━━━━━━━"
-        )
-        send_tg(startup_msg)
+    # Стартовое сообщение (только в 08:45)
+    if "08:45" <= current_klg <= "08:50":
+        modes = ", ".join(models.keys())
+        send_tg(f"🚀 <b>СИМУЛЯТОР ЗАПУЩЕН</b>\nМодели: {modes}\nАкции: {len(tickers)}\nОткрытых позиций: {len(state['positions'])}")
 
     with Client(TOKEN, target=INVEST_GRPC_API_SANDBOX) as client:
         accounts = client.users.get_accounts()
         if not accounts.accounts: 
-            log.info("No sandbox accounts found. Creating a new one...")
             try:
                 new_acc = client.sandbox.open_sandbox_account()
                 acc_id = new_acc.account_id
@@ -144,7 +136,6 @@ def main():
                 return
         else:
             acc_id = accounts.accounts[0].id
-            log.info(f"Using existing sandbox account: {acc_id}")
 
         for ticker in tickers:
             figi = figi_map.get(ticker)
@@ -174,7 +165,6 @@ def main():
                     new_trail = pos["highest"] * (1 - trail_dist_pct / 100)
                     if new_trail > pos["trailing_stop"]:
                         pos["trailing_stop"] = new_trail
-                        log.info(f"{pos_key} trailing stop up to {new_trail:.2f}")
 
                     exit_reason = None
                     if current_price <= pos["trailing_stop"]: exit_reason = "TRAILING_STOP"
@@ -187,19 +177,8 @@ def main():
                             pnl_pct = (current_price - pos["entry"]) / pos["entry"] * 100
                             pnl_rub = (current_price - pos["entry"]) * pos["qty"]
                             emoji = "🟢" if pnl_pct > 0 else "🔴"
-                            history.append({
-                                "ticker": ticker, "mode": mode, "type": "SELL", 
-                                "price": round(current_price, 2), "entry": round(pos["entry"], 2),
-                                "time": now_time.isoformat(), "reason": exit_reason, 
-                                "pnl_pct": round(pnl_pct, 2), "pnl_rub": round(pnl_rub, 2)
-                            })
-                            send_tg(
-                                f"{emoji} <b>ПРОДАЖА {ticker} ({mode.upper()})</b>\n"
-                                f"Причина: {exit_reason}\n"
-                                f"Вход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\n"
-                                f"PnL: {pnl_pct:+.2f}% ({pnl_rub:+.2f}₽)\n"
-                                f"Время: {current_time_str} КЛГ"
-                            )
+                            history.append({"ticker": ticker, "mode": mode, "type": "SELL", "price": round(current_price, 2), "entry": round(pos["entry"], 2), "time": now_time.isoformat(), "reason": exit_reason, "pnl_pct": round(pnl_pct, 2), "pnl_rub": round(pnl_rub, 2)})
+                            send_tg(f"{emoji} <b>ПРОДАЖА {ticker} ({mode.upper()})</b>\nПричина: {exit_reason}\nВход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\nPnL: {pnl_pct:+.2f}% ({pnl_rub:+.2f}₽)\nВремя: {current_klg} КЛГ")
                             del state["positions"][pos_key]
                         except Exception as e: log.error(f"Sell error {pos_key}: {e}")
 
@@ -215,10 +194,11 @@ def main():
                     if model is not None:
                         try:
                             X = last_candle[FEATURE_COLS].values.reshape(1, -1)
-                            signal = int(model.predict(X)[0])
                             if hasattr(model, "predict_proba"):
                                 prob = model.predict_proba(X)[0][1]
+                                signal = 1 if prob >= MIN_PROBABILITY else 0
                             else:
+                                signal = int(model.predict(X)[0])
                                 prob = 1.0 if signal == 1 else 0.0
                         except Exception as e: log.error(f"Pred error {pos_key}: {e}")
                     elif cfg["source"] == "model_custom":
@@ -243,24 +223,12 @@ def main():
                                 "trailing_stop": sl_price, "highest": entry_price,
                                 "exit_time": exit_time.isoformat(), "figi": figi
                             }
-                            history.append({
-                                "ticker": ticker, "mode": mode, "type": "BUY", 
-                                "price": round(entry_price, 2), "time": now_time.isoformat(), 
-                                "reason": "SIGNAL", "pnl_pct": 0.0
-                            })
-                            send_tg(
-                                f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\n"
-                                f"Цена входа: {entry_price:.2f}₽\n"
-                                f"🎯 TP: {tp_price:.2f}₽ (+{cfg['params']['tp_pct']}%)\n"
-                                f"🛑 SL: {sl_price:.2f}₽ (-{cfg['params']['sl_pct']}%)\n"
-                                f"⏱ Выход по времени: {cfg['params']['time_exit_h']}ч\n"
-                                f"📊 Вероятность: {prob*100:.0f}%\n"
-                                f"Время: {current_time_str} КЛГ"
-                            )
+                            history.append({"ticker": ticker, "mode": mode, "type": "BUY", "price": round(entry_price, 2), "time": now_time.isoformat(), "reason": "SIGNAL", "pnl_pct": 0.0})
+                            send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nTP: {tp_price:.2f}₽ (+{cfg['params']['tp_pct']}%)\nSL: {sl_price:.2f}₽ (-{cfg['params']['sl_pct']}%)\nВероятность: {prob*100:.0f}%\nВремя: {current_klg} КЛГ")
                         except Exception as e: log.error(f"Buy error {pos_key}: {e}")
                     else:
                         if model is not None:
-                            log.info(f"{pos_key}: pred={signal}, prob={prob:.2f} (нет сигнала)")
+                            log.info(f"{pos_key}: prob={prob:.2f} (ниже порога {MIN_PROBABILITY})")
 
     with open(STATE_FILE, "w") as f: json.dump(state, f, indent=2, default=str)
     with open(HISTORY_FILE, "w") as f: json.dump(history, f, indent=2, default=str)
