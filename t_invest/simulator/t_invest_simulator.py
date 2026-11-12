@@ -1,5 +1,5 @@
 # ============================================================
-# T-INVEST - SIMULATOR (SANDBOX) WITH NEWS FILTER & BOTH MODES
+# T-INVEST - SIMULATOR (SANDBOX) WITH NEWS FILTER & AUDIT
 # Path: t_invest/simulator/t_invest_simulator.py
 # ============================================================
 
@@ -16,6 +16,7 @@ from t_tech.invest.utils import now
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("simulator")
 
+# --- НАСТРОЙКИ ---
 TOKEN = os.environ.get("T_INVEST_TOKEN")
 TG_TOKEN = os.environ.get("INVEST_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
@@ -85,7 +86,7 @@ def load_news_scores():
     except Exception as e: return {}
 
 def main():
-    log.info("STARTING SIMULATOR (WITH NEWS FILTER)")
+    log.info("STARTING SIMULATOR (WITH NEWS FILTER & AUDIT)")
     if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
         log.error("best_params.json or whitelist.json not found"); return
 
@@ -107,13 +108,11 @@ def main():
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     state = {"positions": {}, "last_h1_candle": {}, "deposit_v3": False, "alert_sent_v3": False}
     
-    # ЗАЩИТА ОТ КРИВОГО STATE.JSON
     if STATE_FILE.exists():
         try:
             with open(STATE_FILE) as f: loaded_state = json.load(f)
             if isinstance(loaded_state, dict):
-                for k, v in loaded_state.items():
-                    state[k] = v
+                for k, v in loaded_state.items(): state[k] = v
         except: pass
         
     if "positions" not in state: state["positions"] = {}
@@ -127,7 +126,9 @@ def main():
     
     news_scores = load_news_scores()
     now_time = datetime.now(timezone.utc)
-    current_klg = now_time.astimezone(KLG_TZ).strftime("%H:%M")
+    
+    # Форматируем красивое время для Telegram (МСК+1 / Калининград)
+    current_klg = now_time.astimezone(KLG_TZ).strftime("%d.%m.%Y %H:%M")
 
     models = {}
     if cfg_intraday and cfg_intraday.get("model_path"):
@@ -160,7 +161,6 @@ def main():
 
             if not state.get("deposit_v3", False):
                 if rub_balance < 10:
-                    # ИСПРАВЛЕНИЕ ОШИБКИ CURRENCY
                     client.sandbox.sandbox_pay_in(
                         account_id=acc_id,
                         amount=MoneyValue(currency="rub", units=10000, nano=0)
@@ -217,12 +217,46 @@ def main():
                     if exit_reason:
                         try:
                             client.sandbox.post_sandbox_order(figi=figi, quantity=pos["qty"], direction=OrderDirection.ORDER_DIRECTION_SELL, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
+                            
+                            entry_time = datetime.fromisoformat(pos["entry_time"])
+                            duration_hours = round((now_time - entry_time).total_seconds() / 3600, 2)
+                            
                             pnl_pct = (current_price - pos["entry"]) / pos["entry"] * 100
                             pnl_rub = (current_price - pos["entry"]) * pos["qty"] * lot
                             rub_balance += (current_price * pos["qty"] * lot)
                             emoji = "🟢" if pnl_pct > 0 else "🔴"
-                            history.append({"ticker": ticker, "mode": mode, "type": "SELL", "price": round(current_price, 2), "entry": round(pos["entry"], 2), "time": now_time.isoformat(), "reason": exit_reason, "pnl_pct": round(pnl_pct, 2), "pnl_rub": round(pnl_rub, 2)})
-                            send_tg(f"{emoji} <b>ПРОДАЖА {ticker} ({mode.upper()})</b>\nПричина: {exit_reason}\nВход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\nPnL: {pnl_pct:+.2f}% ({pnl_rub:+.2f}₽)\nВремя: {current_klg} КЛГ")
+                            
+                            # Формируем запись для аудита
+                            trade_record = {
+                                "ticker": ticker,
+                                "mode": mode,
+                                "type": "SELL",
+                                "entry_time": pos["entry_time"],
+                                "entry_price": round(pos["entry"], 2),
+                                "entry_prob": pos.get("entry_prob", 0.0),
+                                "exit_time": now_time.isoformat(),
+                                "exit_price": round(current_price, 2),
+                                "reason": exit_reason,
+                                "duration_hours": duration_hours,
+                                "pnl_pct": round(pnl_pct, 2),
+                                "pnl_rub": round(pnl_rub, 2),
+                                "balance_after": round(rub_balance, 2)
+                            }
+                            
+                            # Пишем в лог специальную метку для будущего парсера аудита
+                            log.info(f"AUDIT_TRADE: {json.dumps(trade_record)}")
+                            
+                            history.append(trade_record)
+                            
+                            send_tg(
+                                f"{emoji} <b>ПРОДАЖА {ticker} ({mode.upper()})</b>\n"
+                                f"Причина: {exit_reason}\n"
+                                f"Вход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\n"
+                                f"Держали: {duration_hours} ч.\n"
+                                f"PnL: {pnl_pct:+.2f}% ({pnl_rub:+.2f}₽)\n"
+                                f"Баланс: {rub_balance:.2f}₽\n"
+                                f"Время: {current_klg} КЛГ"
+                            )
                             del state["positions"][pos_key]
                         except Exception as e: log.error(f"Sell error {pos_key}: {e}")
 
@@ -282,13 +316,31 @@ def main():
                             
                             state["positions"][pos_key] = {
                                 "side": "long", "entry": entry_price, "qty": 1,
+                                "entry_time": now_time.isoformat(), # НОВОЕ ПОЛЕ
+                                "entry_prob": prob,                 # НОВОЕ ПОЛЕ
                                 "tp": tp_price, "sl": sl_price,
                                 "trailing_stop": sl_price, "highest": entry_price,
                                 "exit_time": exit_time.isoformat(), "figi": figi
                             }
                             state["last_h1_candle"][pos_key] = last_candle_time
-                            history.append({"ticker": ticker, "mode": mode, "type": "BUY", "price": round(entry_price, 2), "time": now_time.isoformat(), "reason": "SIGNAL", "pnl_pct": 0.0})
-                            send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nЛот: {lot} шт.\nTP: {tp_price:.2f}₽\nSL: {sl_price:.2f}₽\nВероятность: {prob*100:.0f}%\nОстаток баланса: {rub_balance:.2f}₽\nВремя: {current_klg} КЛГ")
+                            
+                            history.append({
+                                "ticker": ticker,
+                                "mode": mode,
+                                "type": "BUY",
+                                "entry_time": now_time.isoformat(),
+                                "entry_price": round(entry_price, 2),
+                                "entry_prob": round(prob, 4)
+                            })
+                            
+                            send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\n"
+                                    f"Цена: {entry_price:.2f}₽\n"
+                                    f"Лот: {lot} шт.\n"
+                                    f"TP: {tp_price:.2f}₽\n"
+                                    f"SL: {sl_price:.2f}₽\n"
+                                    f"Вероятность: {prob*100:.0f}%\n"
+                                    f"Остаток баланса: {rub_balance:.2f}₽\n"
+                                    f"Время: {current_klg} КЛГ")
                         except Exception as e: log.error(f"Buy error {pos_key}: {e}")
 
     with open(STATE_FILE, "w") as f: json.dump(state, f, indent=2, default=str)
