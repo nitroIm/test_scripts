@@ -12,7 +12,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("INVEST_BOT_TOKEN")
-CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
+# ИСПРАВЛЕНИЕ: Теперь читаем переменную канала
+CHAT_ID = os.environ.get("TG_T_INVEST_CHANNEL") 
 
 NEWS_SCORES_FILE = "t_invest/data/news/t_invest_news_scores.json"
 NEWS_COLLECTOR_FILE = "t_invest/data/news/t_invest_news_collector.json"
@@ -20,23 +21,25 @@ WHITELIST_FILE = "t_invest/data/scanner/whitelist.json"
 
 KLG_TZ = timezone(timedelta(hours=2))
 
-# Стоп-слова для заголовков, которые не несут смысла для трейдера
 STOP_WORDS = ["итоги торгов", "анонс", "обзор", "краткий обзор", "лидеры роста", "лидеры падения"]
 
 def send_telegram_message(text):
     if not TOKEN or not CHAT_ID: 
+        log.error(f"Нет TG токена или ID (TOKEN: {bool(TOKEN)}, CHAT_ID: {bool(CHAT_ID)})")
         return False
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True}
     try:
         response = requests.post(url, json=payload, timeout=15)
-        return response.json().get("ok", False)
+        res_data = response.json()
+        if not res_data.get("ok"):
+            log.error(f"Ошибка API Telegram: {res_data}")
+        return res_data.get("ok", False)
     except Exception as e:
         log.error(f"TG Send Error: {e}")
         return False
 
 def get_score_text(score):
-    # ИСПРАВЛЕНЫ ЦВЕТА
     if score >= 0.7: return "🟢 Сильный позитив"
     if score > 0: return "🟢 Позитив"
     if score <= -0.7: return "🔴 Сильный негатив"
@@ -54,14 +57,12 @@ def get_news_title(ticker, news_list):
         title = news.get('title', '')
         
         if not title or is_trash(title): continue
-        if len(tickers) > 5: continue # Пропускаем общие обзоры рынка
+        if len(tickers) > 5: continue 
 
         if ticker == "_MARKET_":
-            # Для макро берем обзоры рынка (где >5 тикеров)
             if len(tickers) > 5 and not is_trash(title):
                 return title
         else:
-            # Для конкретной акции, где мало тикеров и это не мусор
             if ticker in tickers and len(tickers) <= 3:
                 return title
     return ""
@@ -87,7 +88,7 @@ def main():
         if not isinstance(info, dict): continue
         score = info.get("score", 0.0)
         
-        if abs(score) < 0.15: continue # Отсекаем нейтральный шум
+        if abs(score) < 0.15: continue 
 
         if ticker == "_MARKET_":
             title = get_news_title("_MARKET_", news_data)
@@ -122,9 +123,10 @@ def main():
     text += "⚠️ <i>Не ИИР. Торговля — риск.</i>"
 
     if send_telegram_message(text):
-        log.info("Новостной дайджест успешно отправлен.")
+        log.info("Новостной дайджест успешно отправлен в канал.")
     else:
         log.error("Ошибка отправки в Telegram.")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
