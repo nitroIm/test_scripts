@@ -1,3 +1,92 @@
 {
- 
+  "positions": {
+    "ETLN_swing": {
+      "side": "long",
+      "entry": 24.94,
+      "qty": 1,
+      "tp": 26.935200000000002,
+      "sl": 24.1918,
+      "trailing_stop": 24.1918,
+      "highest": 24.94,
+      "exit_time": "2026-11-13T14:29:40.854757+00:00",
+      "figi": "TCS50A10C1L6"
+    },
+    "VKCO_intraday": {
+      "side": "long",
+      "entry": 241.75,
+      "qty": 1,
+      "tp": 246.585,
+      "sl": 239.3325,
+      "trailing_stop": 239.3325,
+      "highest": 241.75,
+      "exit_time": "2026-11-13T02:29:40.854757+00:00",
+      "figi": "TCS00A106YF0"
+    },
+    "MVID_intraday": {
+      "side": "long",
+      "entry": 52.8,
+      "qty": 1,
+      "tp": 53.855999999999995,
+      "sl": 52.272,
+      "trailing_stop": 52.272,
+      "highest": 52.8,
+      "exit_time": "2026-11-13T02:29:40.854757+00:00",
+      "figi": "BBG004S68CP5"
+    },
+    "MVID_swing": {
+      "side": "long",
+      "entry": 52.8,
+      "qty": 1,
+      "tp": 57.024,
+      "sl": 51.215999999999994,
+      "trailing_stop": 51.215999999999994,
+      "highest": 52.8,
+      "exit_time": "2026-11-13T14:29:40.854757+00:00",
+      "figi": "BBG004S68CP5"
+    },
+    "EUTR_intraday": {
+      "side": "long",
+      "entry": 13.5,
+      "qty": 1,
+      "tp": 13.77,
+      "sl": 13.365,
+      "trailing_stop": 13.365,
+      "highest": 13.5,
+      "exit_time": "2026-11-13T02:29:40.854757+00:00",
+      "figi": "TCS00A1002V2"
+    },
+    "LSRG_intraday": {
+      "side": "long",
+      "entry": 920.4,
+      "qty": 1,
+      "tp": 938.808,
+      "sl": 911.1959999999999,
+      "trailing_stop": 911.1959999999999,
+      "highest": 920.4,
+      "exit_time": "2026-11-13T02:29:40.854757+00:00",
+      "figi": "BBG004S68C39"
+    },
+    "LSRG_swing": {
+      "side": "long",
+      "entry": 920.4,
+      "qty": 1,
+      "tp": 994.032,
+      "sl": 892.7879999999999,
+      "trailing_stop": 892.7879999999999,
+      "highest": 920.4,
+      "exit_time": "2026-11-13T14:29:40.854757+00:00",
+      "figi": "BBG004S68C39"
+    }
+  },
+  "last_h1_candle": {
+    "ETLN_swing": "2026-11-12T14:00:00+00:00",
+    "VKCO_intraday": "2026-11-12T14:00:00+00:00",
+    "MVID_intraday": "2026-11-12T14:00:00+00:00",
+    "MVID_swing": "2026-11-12T14:00:00+00:00",
+    "EUTR_intraday": "2026-11-12T14:00:00+00:00",
+    "LSRG_intraday": "2026-11-12T14:00:00+00:00",
+    "LSRG_swing": "2026-11-12T14:00:00+00:00"
+  },
+  "deposit_v3": true,
+  "alert_sent_v3": false
 }

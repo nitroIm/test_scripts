@@ -1,1 +1,65 @@
-[]
+[
+  {
+    "ticker": "ETLN",
+    "mode": "swing",
+    "type": "BUY",
+    "price": 24.94,
+    "time": "2026-11-12T14:29:40.854757+00:00",
+    "reason": "SIGNAL",
+    "pnl_pct": 0.0
+  },
+  {
+    "ticker": "VKCO",
+    "mode": "intraday",
+    "type": "BUY",
+    "price": 241.75,
+    "time": "2026-11-12T14:29:40.854757+00:00",
+    "reason": "SIGNAL",
+    "pnl_pct": 0.0
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "type": "BUY",
+    "price": 52.8,
+    "time": "2026-11-12T14:29:40.854757+00:00",
+    "reason": "SIGNAL",
+    "pnl_pct": 0.0
+  },
+  {
+    "ticker": "MVID",
+    "mode": "swing",
+    "type": "BUY",
+    "price": 52.8,
+    "time": "2026-11-12T14:29:40.854757+00:00",
+    "reason": "SIGNAL",
+    "pnl_pct": 0.0
+  },
+  {
+    "ticker": "EUTR",
+    "mode": "intraday",
+    "type": "BUY",
+    "price": 13.5,
+    "time": "2026-11-12T14:29:40.854757+00:00",
+    "reason": "SIGNAL",
+    "pnl_pct": 0.0
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "type": "BUY",
+    "price": 920.4,
+    "time": "2026-11-12T14:29:40.854757+00:00",
+    "reason": "SIGNAL",
+    "pnl_pct": 0.0
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "swing",
+    "type": "BUY",
+    "price": 920.4,
+    "time": "2026-11-12T14:29:40.854757+00:00",
+    "reason": "SIGNAL",
+    "pnl_pct": 0.0
+  }
+]
