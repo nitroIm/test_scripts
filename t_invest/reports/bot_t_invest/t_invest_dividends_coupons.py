@@ -25,7 +25,6 @@ WHITELIST_FILE = "t_invest/data/scanner/whitelist.json"
 
 KLG_TZ = timezone(timedelta(hours=2))
 
-# Надежные эмитенты для фильтрации облигаций
 RELIABLE_ISSUERS = ["ОФЗ", "Сбер", "Газпром", "Лукойл", "Роснефть", "РЖД", "МТС", "Магнит"]
 
 def q2f(q):
@@ -51,24 +50,23 @@ def send_telegram_photo(photo_buf, caption):
 
 def create_chart(stocks_data, bonds_data):
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(8, 5), facecolor='#1a1a1a')
+    # Увеличили размер фигуры, чтобы шрифты помещались и были большими
+    fig, ax = plt.subplots(figsize=(10, 6), facecolor='#1a1a1a')
     ax.set_facecolor('#1a1a1a')
 
     labels = []
     values = []
     colors = []
 
-    # Добавляем акции (доходность в %)
     for s in stocks_data:
         labels.append(s['ticker'])
         values.append(s['yield_pct'])
-        colors.append('#00C853') # Зеленый для акций
+        colors.append('#00C853')
 
-    # Добавляем облигации (сумма купона в рублях)
     for b in bonds_data:
-        labels.append(b['display_name']) # Используем нормальное имя
+        labels.append(b['display_name'])
         values.append(b['coupon_value'])
-        colors.append('#29B6F6') # Синий для облигаций
+        colors.append('#29B6F6')
 
     if not labels:
         return None
@@ -76,20 +74,34 @@ def create_chart(stocks_data, bonds_data):
     y_pos = range(len(labels))
     bars = ax.barh(y_pos, values, color=colors, height=0.6)
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=11, fontweight='bold')
+    
+    # УВЕЛИЧИЛИ ШРИФТ НАЗВАНИЙ
+    ax.set_yticklabels(labels, fontsize=14, fontweight='bold')
     ax.invert_yaxis()
 
+    # УВЕЛИЧИЛИ ШРИФТ ЦИФР НА СТОЛБИКАХ
     for bar in bars:
         width = bar.get_width()
         ax.text(width, bar.get_y() + bar.get_height()/2, f' {width:.2f}', 
-                va='center', ha='left', color='white', fontweight='bold')
+                va='center', ha='left', color='white', fontweight='bold', fontsize=14)
 
-    ax.set_title("Выплаты: Акции (Доходность %) / Облигации (Купон ₽)", color='#aaaaaa', pad=15)
+    # Динамический заголовок
+    if stocks_data and bonds_data:
+        title = "Выплаты: Акции (Доходность %) / Облигации (Купон ₽)"
+    elif bonds_data:
+        title = "Купоны (облигации): Размер выплаты в ₽"
+    else:
+        title = "Дивиденды (акции): Доходность в %"
+
+    # УВЕЛИЧИЛИ ШРИФТ ЗАГОЛОВКА
+    ax.set_title(title, color='#ffffff', pad=20, fontsize=16, fontweight='bold')
+    
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
-    ax.tick_params(axis='x', colors='#aaaaaa')
+    # УВЕЛИЧИЛИ ШРИФТ ОСИ X (цифры внизу)
+    ax.tick_params(axis='x', colors='#aaaaaa', labelsize=12)
 
     plt.tight_layout()
     buf = io.BytesIO()
@@ -110,7 +122,7 @@ def main():
     bonds_events = []
 
     with Client(TOKEN, target=INVEST_GRPC_API) as client:
-        # === 1. ДИВИДЕНДЫ ПО АКЦИЯМ ИЗ WHITELIST ===
+        # === 1. ДИВИДЕНДЫ ===
         if os.path.exists(WHITELIST_FILE):
             with open(WHITELIST_FILE, "r", encoding="utf-8") as f:
                 wl_data = json.load(f)
@@ -142,7 +154,7 @@ def main():
 
         stocks_events = sorted(stocks_events, key=lambda x: x['yield_pct'], reverse=True)[:5]
 
-        # === 2. КУПОНЫ ПО ОБЛИГАЦИЯМ ===
+        # === 2. КУПОНЫ ===
         try:
             bonds_resp = client.instruments.bonds(instrument_status=1)
             for b in bonds_resp.instruments:
@@ -166,11 +178,10 @@ def main():
                                     nkd_val = q2f(nkd_resp.accrued_interests[0].value)
                             except: pass
 
-                            # ИСПРАВЛЕНИЕ: Делаем нормальное отображаемое имя
                             raw_ticker = b.ticker if b.ticker else ""
                             if raw_ticker.startswith("RU") or not raw_ticker:
-                                # Берем название, обрезаем до 15 символов
-                                display_name = b.name[:15].strip()
+                                # Увеличили лимит обрезки имени до 25 символов, чтобы было понятнее
+                                display_name = b.name[:25].strip()
                             else:
                                 display_name = raw_ticker
 
@@ -209,7 +220,6 @@ def main():
     if bonds_events:
         text += "🏦 <b>Купоны (облигации):</b>\n"
         for b in bonds_events:
-            # В тексте тоже используем display_name
             if b['date'] == "сегодня":
                 text += f"• <b>{b['display_name']}</b> — Купон: {format_money(b['coupon_value'])} ₽ | НКД: {format_money(b['nkd'])} ₽\n"
             else:
