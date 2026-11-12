@@ -1,7 +1,7 @@
 name: T-Invest News Report
 
 on:
-  workflow_dispatch: # Для ручного теста
+  workflow_dispatch: # Только ручной запуск или внешний триггер через cron-job.org
 
 jobs:
   send-news:
@@ -18,12 +18,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests==2.32.3 matplotlib==3.8.4 numpy==1.26.4
+          pip install requests==2.32.3
           
       - name: Run Script
         env:
-          # ВАЖНО: Тут отправляем в ЛИЧКУ (INVEST_BOT_CHAT_ID), а не в канал
           INVEST_BOT_TOKEN: ${{ secrets.INVEST_BOT_TOKEN }}
-          INVEST_BOT_CHAT_ID: ${{ secrets.INVEST_BOT_CHAT_ID }}
+          # ЗАМЕНИЛИ НА КАНАЛ:
+          TG_T_INVEST_CHANNEL: ${{ secrets.TG_T_INVEST_CHANNEL }}
         run: |
           python t_invest/reports/bot_t_invest/t_invest_news_report.py
