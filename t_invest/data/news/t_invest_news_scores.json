@@ -2,56 +2,106 @@
   "GAZP": {
     "score": 1.0,
     "news_count": 6,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "VTBR": {
     "score": 1.0,
     "news_count": 4,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "T": {
     "score": 1.0,
     "news_count": 4,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "POSI": {
     "score": 1.0,
-    "news_count": 3,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "news_count": 4,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "SBER": {
     "score": 1.0,
     "news_count": 8,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "PHOR": {
-    "score": 0.25,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "score": 1.0,
+    "news_count": 2,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "YDEX": {
     "score": 0.5,
     "news_count": 1,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "SBERP": {
     "score": -1.0,
     "news_count": 3,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "DOMRF": {
     "score": 1.0,
-    "news_count": 1,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "news_count": 2,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "SMLT": {
     "score": 1.0,
+    "news_count": 3,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "RTKM": {
+    "score": 1.0,
     "news_count": 1,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "ROSN": {
+    "score": -1.0,
+    "news_count": 2,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "SIBN": {
+    "score": 1.0,
+    "news_count": 1,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "HEAD": {
+    "score": 1.0,
+    "news_count": 1,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "VKCO": {
+    "score": 1.0,
+    "news_count": 1,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "LKOH": {
+    "score": -1.0,
+    "news_count": 1,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "MOEX": {
+    "score": -1.0,
+    "news_count": 2,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "SELG": {
+    "score": 0.5,
+    "news_count": 1,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "RUAL": {
+    "score": 1.0,
+    "news_count": 1,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
+  },
+  "GMKN": {
+    "score": 1.0,
+    "news_count": 1,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   },
   "_MARKET_": {
-    "score": 0.0,
-    "news_count": 2,
-    "updated_at": "2026-11-11T15:42:45.865556+00:00"
+    "score": 1.0,
+    "news_count": 6,
+    "updated_at": "2026-11-12T06:48:29.667001+00:00"
   }
 }
