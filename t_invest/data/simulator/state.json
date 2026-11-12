@@ -17,8 +17,8 @@
       "qty": 1,
       "tp": 246.585,
       "sl": 239.3325,
-      "trailing_stop": 240.64075,
-      "highest": 241.85,
+      "trailing_stop": 240.69050000000001,
+      "highest": 241.9,
       "exit_time": "2026-11-13T02:29:40.854757+00:00",
       "figi": "TCS00A106YF0"
     },
@@ -72,10 +72,36 @@
       "qty": 1,
       "tp": 14.526,
       "sl": 13.046499999999998,
-      "trailing_stop": 13.046499999999998,
-      "highest": 13.45,
+      "trailing_stop": 13.34675,
+      "highest": 13.55,
       "exit_time": "2026-11-13T14:46:17.657193+00:00",
       "figi": "TCS00A1002V2"
+    },
+    "EUTR_intraday": {
+      "side": "long",
+      "entry": 13.55,
+      "qty": 1,
+      "entry_time": "2026-11-12T15:01:42.541919+00:00",
+      "entry_prob": 0.36,
+      "tp": 13.821000000000002,
+      "sl": 13.4145,
+      "trailing_stop": 13.4145,
+      "highest": 13.55,
+      "exit_time": "2026-11-13T03:01:42.541919+00:00",
+      "figi": "TCS00A1002V2"
+    },
+    "ETLN_intraday": {
+      "side": "long",
+      "entry": 24.9,
+      "qty": 1,
+      "entry_time": "2026-11-12T15:01:42.541919+00:00",
+      "entry_prob": 0.43,
+      "tp": 25.398,
+      "sl": 24.651,
+      "trailing_stop": 24.651,
+      "highest": 24.9,
+      "exit_time": "2026-11-13T03:01:42.541919+00:00",
+      "figi": "TCS50A10C1L6"
     }
   },
   "last_h1_candle": {
@@ -83,10 +109,11 @@
     "VKCO_intraday": "2026-11-12T14:00:00+00:00",
     "MVID_intraday": "2026-11-12T14:00:00+00:00",
     "MVID_swing": "2026-11-12T14:00:00+00:00",
-    "EUTR_intraday": "2026-11-12T14:00:00+00:00",
+    "EUTR_intraday": "2026-11-12T15:00:00+00:00",
     "LSRG_intraday": "2026-11-12T14:00:00+00:00",
     "LSRG_swing": "2026-11-12T14:00:00+00:00",
-    "EUTR_swing": "2026-11-12T14:00:00+00:00"
+    "EUTR_swing": "2026-11-12T14:00:00+00:00",
+    "ETLN_intraday": "2026-11-12T15:00:00+00:00"
   },
   "deposit_v3": true,
   "alert_sent_v3": false
