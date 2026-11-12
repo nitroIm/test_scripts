@@ -17,9 +17,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("INVEST_BOT_TOKEN")
-CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")  # В workflow сюда подставим ЛИЧКУ
+CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
 
-NEWS_FILE = "t_invest/data/news/t_invest_news_scores.json"
+NEWS_SCORES_FILE = "t_invest/data/news/t_invest_news_scores.json"
+NEWS_COLLECTOR_FILE = "t_invest/data/news/t_invest_news_collector.json"
 WHITELIST_FILE = "t_invest/data/scanner/whitelist.json"
 
 KLG_TZ = timezone(timedelta(hours=2))
@@ -43,32 +44,27 @@ def create_news_chart(items):
     fig, ax = plt.subplots(figsize=(10, 5), facecolor='#1a1a1a')
     ax.set_facecolor('#1a1a1a')
 
-    # Сортируем по модулю скора для графика
-    items = sorted(items, key=lambda x: abs(x['score']), reverse=True)[:7]
     labels = [i['ticker'] for i in items]
     scores = [i['score'] for i in items]
-    
     colors = ['#00C853' if s > 0 else '#D50000' for s in scores]
 
     y_pos = np.arange(len(labels))
     bars = ax.barh(y_pos, scores, color=colors, height=0.6)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=14, fontweight='bold')
-    ax.invert_yaxis() # Сверху самые сильные
+    ax.invert_yaxis()
     
-    # Рисуем вертикальную линию нуля
     ax.axvline(0, color='#555555', linewidth=1, zorder=0)
 
     for bar in bars:
         width = bar.get_width()
-        # Подпись внутри или снаружи столбика
         ha = 'left' if width > 0 else 'right'
         offset = 0.02 if width > 0 else -0.02
         ax.text(width + offset, bar.get_y() + bar.get_height()/2, 
                 f'{width:+.2f}', va='center', ha=ha, 
                 color='white', fontweight='bold', fontsize=12)
 
-    ax.set_title("Тональность новостей (скоры)", color='#ffffff', pad=20, fontsize=16, fontweight='bold')
+    ax.set_title("Тональность новостей", color='#ffffff', pad=20, fontsize=16, fontweight='bold')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
@@ -82,51 +78,67 @@ def create_news_chart(items):
     buf.seek(0)
     return buf
 
+def get_news_title(ticker, news_list):
+    # Ищем самые свежие новости по тикеру
+    for news in sorted(news_list, key=lambda x: x.get('ts', ''), reverse=True):
+        tickers = news.get('tickers', [])
+        title = news.get('title', '')
+        
+        if not title: 
+            continue
+            
+        if ticker == "_MARKET_":
+            # Для макро берем новости, где больше 5 тикеров (общерыночные)
+            if len(tickers) > 5:
+                return title
+        else:
+            # Для конкретной акции ищем, где она есть в списке
+            if ticker in tickers and len(tickers) <= 10:
+                return title
+    return ""
+
 def main():
-    if not os.path.exists(NEWS_FILE) or not os.path.exists(WHITELIST_FILE):
-        log.error("Файлы новостей или вотчлиста не найдены")
+    if not os.path.exists(NEWS_SCORES_FILE) or not os.path.exists(NEWS_COLLECTOR_FILE) or not os.path.exists(WHITELIST_FILE):
+        log.error("Один из файлов (scores, collector, whitelist) не найден")
         sys.exit(1)
 
-    with open(NEWS_FILE, "r", encoding="utf-8") as f:
+    with open(NEWS_SCORES_FILE, "r", encoding="utf-8") as f:
+        scores_data = json.load(f)
+    with open(NEWS_COLLECTOR_FILE, "r", encoding="utf-8") as f:
         news_data = json.load(f)
     with open(WHITELIST_FILE, "r", encoding="utf-8") as f:
         wl_data = json.load(f)
 
-    # Получаем актуальные тикеры из вотчлиста
-    wl_stocks = wl_data.get("data", [])
-    valid_tickers = {s["ticker"] for s in wl_stocks}
-
-    # Данные могут быть в корне или внутри ключа "data"
-    if isinstance(news_data, dict) and "data" in news_data:
-        news_data = news_data["data"]
+    valid_tickers = {s["ticker"] for s in wl_data.get("data", [])}
 
     macro_news = []
     stock_news = []
 
-    for ticker, info in news_data.items():
+    # 1. Разбираем скоры
+    for ticker, info in scores_data.items():
         if not isinstance(info, dict): continue
         score = info.get("score", 0.0)
-        title = info.get("title", "")
         
-        # Фильтруем слабый шум (меньше 0.15)
-        if abs(score) < 0.15: continue
-        if not title: continue
+        if abs(score) < 0.15: continue # Отсекаем шум
 
         if ticker == "_MARKET_":
-            macro_news.append({"ticker": "Рынок", "score": score, "title": title})
+            title = get_news_title("_MARKET_", news_data)
+            if title: macro_news.append({"ticker": "Рынок", "score": score, "title": title})
         elif ticker in valid_tickers:
-            stock_news.append({"ticker": ticker, "score": score, "title": title})
+            title = get_news_title(ticker, news_data)
+            if title: stock_news.append({"ticker": ticker, "score": score, "title": title})
 
-    # Сортируем
+    # 2. Сортируем и берем топы
     macro_news = sorted(macro_news, key=lambda x: abs(x['score']), reverse=True)[:3]
     stock_news = sorted(stock_news, key=lambda x: abs(x['score']), reverse=True)[:5]
 
     all_news = macro_news + stock_news
 
     if not all_news:
-        log.info("Нет новостей с сильным скором. Пост не отправлен.")
+        log.info("Нет подходящих новостей с заголовками. Пост не отправлен.")
         sys.exit(0)
 
+    # 3. Формируем текст
     now_klg = datetime.now(KLG_TZ).strftime("%d.%m.%Y %H:%M")
     text = f"⚡️ <b>Главное сейчас | {now_klg}</b>\n\n"
 
@@ -146,6 +158,7 @@ def main():
 
     text += "⚠️ <i>Не ИИР. Торговля — риск.</i>"
 
+    # 4. Рисуем график и отправляем
     log.info("Генерация графика...")
     chart_buf = create_news_chart(all_news)
 
