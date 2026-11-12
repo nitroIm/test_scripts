@@ -63,9 +63,9 @@ def compute_features(df):
     df['price_change_1h'] = df['close'].pct_change(1); df['price_change_4h'] = df['close'].pct_change(4); df['price_change_24h'] = df['close'].pct_change(24)
     return df
 
-def fetch_h1_candles(client, figi, count=50):
+def fetch_h1_candles(client, figi, count=720): # УВЕЛИЧИЛИ ЗАПРОС ДО 720 ЧАСОВ (30 ДНЕЙ)
     try:
-        resp = client.market_data.get_candles(figi=figi, from_=now()-timedelta(hours=count*2), to=now(), interval=CandleInterval.CANDLE_INTERVAL_HOUR)
+        resp = client.market_data.get_candles(figi=figi, from_=now()-timedelta(hours=count), to=now(), interval=CandleInterval.CANDLE_INTERVAL_HOUR)
         rows = [{"time": c.time, "open": q2f(c.open), "high": q2f(c.high), "low": q2f(c.low), "close": q2f(c.close), "volume": c.volume} for c in resp.candles]
         df = pd.DataFrame(rows)
         df['time'] = pd.to_datetime(df['time'], utc=True)
@@ -144,10 +144,6 @@ def main():
         else:
             log.error(f"Model swing NOT FOUND: {p}")
 
-    if "08:45" <= current_klg <= "08:50":
-        modes = ", ".join(models.keys())
-        send_tg(f"🚀 <b>СИМУЛЯТОР ЗАПУЩЕН</b>\nМодели: {modes}\nАкции: {len(tickers)}\nПорог вероятности: {MIN_PROBABILITY*100:.0f}%\nНовостной фильтр: ВКЛ (порог {NEWS_BLOCK_THRESHOLD})")
-
     with Client(TOKEN, target=INVEST_GRPC_API_SANDBOX) as client:
         accounts = client.users.get_accounts()
         if not accounts.accounts: 
@@ -169,10 +165,16 @@ def main():
             if current_price <= 0: continue
 
             df_h1 = fetch_h1_candles(client, figi)
-            if len(df_h1) < 30: continue
+            if len(df_h1) < 200: 
+                log.warning(f"{ticker}: Мало свечей ({len(df_h1)}) для расчета индикаторов. Пропуск.")
+                continue
+                
             last_candle_time = df_h1.iloc[-1]['time'].isoformat()
             df_h1 = compute_features(df_h1).dropna()
-            if df_h1.empty: continue
+            if df_h1.empty: 
+                log.warning(f"{ticker}: Таблица пуста после dropna(). Пропуск.")
+                continue
+                
             last_candle = df_h1.iloc[-1]
 
             for mode, cfg in [("intraday", cfg_intraday), ("swing", cfg_swing)]:
@@ -226,24 +228,18 @@ def main():
                             signal = 1
                             prob = 1.0
 
-                    # ИЗМЕНЕНИЕ: Убрали continue, чтобы prob всегда выводился в лог
-                    # state["last_h1_candle"][pos_key] = last_candle_time
-                    
                     # ЛОГИРУЕМ ВЕРОЯТНОСТЬ ВСЕГДА
                     news_data = news_scores.get(ticker, {})
-                    news_score = news_data.get("score", 0.0)
+                    news_score = news_data.get("score", 0.0) if isinstance(news_data, dict) else 0.0
                     
-                    log.info(f"{pos_key}: prob={prob:.2f}, news={news_score:.2f}, signal={signal}, last_candle={last_candle_time}")
+                    log.info(f"{pos_key}: prob={prob:.2f}, news={news_score:.2f}, signal={signal}")
 
                     if signal == 1:
-                        # Дополнительная защита от повторной покупки на той же свече
                         if state["last_h1_candle"].get(pos_key) == last_candle_time:
-                            log.info(f"{pos_key} Сигнал есть, но позиция на этой свече уже открывалась. Пропуск.")
                             continue
 
                         if news_score < NEWS_BLOCK_THRESHOLD:
                             log.info(f"{pos_key} SIGNAL! Но новости плохие ({news_score}). Пропуск.")
-                            send_tg(f"⚠️ <b>ОТМЕНА ПОКУПКИ {ticker} ({mode.upper()})</b>\nТехсигнал есть, но новостной фон негативный (Скор: {news_score}).")
                             continue
                         
                         log.info(f"{pos_key} SIGNAL! Buying...")
@@ -260,7 +256,7 @@ def main():
                                 "trailing_stop": sl_price, "highest": entry_price,
                                 "exit_time": exit_time.isoformat(), "figi": figi
                             }
-                            state["last_h1_candle"][pos_key] = last_candle_time # Записываем свечу только при покупке
+                            state["last_h1_candle"][pos_key] = last_candle_time
                             history.append({"ticker": ticker, "mode": mode, "type": "BUY", "price": round(entry_price, 2), "time": now_time.isoformat(), "reason": "SIGNAL", "pnl_pct": 0.0})
                             send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nTP: {tp_price:.2f}₽ (+{cfg['params']['tp_pct']}%)\nSL: {sl_price:.2f}₽ (-{cfg['params']['sl_pct']}%)\nВероятность: {prob*100:.0f}%\nНовости: {news_score}\nВремя: {current_klg} КЛГ")
                         except Exception as e: log.error(f"Buy error {pos_key}: {e}")
