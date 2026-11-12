@@ -17,8 +17,8 @@
       "qty": 1,
       "tp": 246.585,
       "sl": 239.3325,
-      "trailing_stop": 240.69050000000001,
-      "highest": 241.9,
+      "trailing_stop": 242.08350000000002,
+      "highest": 243.3,
       "exit_time": "2026-11-13T02:29:40.854757+00:00",
       "figi": "TCS00A106YF0"
     },
@@ -55,19 +55,6 @@
       "exit_time": "2026-11-13T14:46:17.657193+00:00",
       "figi": "TCS00A1002V2"
     },
-    "EUTR_intraday": {
-      "side": "long",
-      "entry": 13.55,
-      "qty": 1,
-      "entry_time": "2026-11-12T15:01:42.541919+00:00",
-      "entry_prob": 0.36,
-      "tp": 13.821000000000002,
-      "sl": 13.4145,
-      "trailing_stop": 13.532,
-      "highest": 13.6,
-      "exit_time": "2026-11-13T03:01:42.541919+00:00",
-      "figi": "TCS00A1002V2"
-    },
     "ETLN_intraday": {
       "side": "long",
       "entry": 24.9,
@@ -89,7 +76,7 @@
       "entry_prob": 0.41,
       "tp": 949.62,
       "sl": 921.6899999999999,
-      "trailing_stop": 921.6899999999999,
+      "trailing_stop": 926.345,
       "highest": 931.0,
       "exit_time": "2026-11-13T03:31:30.036360+00:00",
       "figi": "BBG004S68C39"
