@@ -25,7 +25,7 @@ WHITELIST_FILE = "t_invest/data/scanner/whitelist.json"
 
 KLG_TZ = timezone(timedelta(hours=2))
 
-# Надежные эмитенты для фильтрации облигаций (ОФЗ и первый эшелон)
+# Надежные эмитенты для фильтрации облигаций
 RELIABLE_ISSUERS = ["ОФЗ", "Сбер", "Газпром", "Лукойл", "Роснефть", "РЖД", "МТС", "Магнит"]
 
 def q2f(q):
@@ -66,7 +66,7 @@ def create_chart(stocks_data, bonds_data):
 
     # Добавляем облигации (сумма купона в рублях)
     for b in bonds_data:
-        labels.append(b['ticker'])
+        labels.append(b['display_name']) # Используем нормальное имя
         values.append(b['coupon_value'])
         colors.append('#29B6F6') # Синий для облигаций
 
@@ -76,10 +76,9 @@ def create_chart(stocks_data, bonds_data):
     y_pos = range(len(labels))
     bars = ax.barh(y_pos, values, color=colors, height=0.6)
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=12, fontweight='bold')
-    ax.invert_yaxis() # Сверху самые крупные
+    ax.set_yticklabels(labels, fontsize=11, fontweight='bold')
+    ax.invert_yaxis()
 
-    # Подписи на столбиках
     for bar in bars:
         width = bar.get_width()
         ax.text(width, bar.get_y() + bar.get_height()/2, f' {width:.2f}', 
@@ -104,7 +103,6 @@ def main():
         log.error("Нет T_INVEST_TOKEN")
         sys.exit(1)
 
-    # Дата сегодня и завтра (МСК/КЛГ)
     today = datetime.now(KLG_TZ).date()
     tomorrow = today + timedelta(days=1)
 
@@ -126,7 +124,6 @@ def main():
                     for d in divs.dividends:
                         r_date = d.record_date.date()
                         if r_date in (today, tomorrow):
-                            # Берем цену для расчета доходности
                             price_resp = client.market_data.get_last_prices(figi=[figi])
                             price = q2f(price_resp.last_prices[0].price) if price_resp.last_prices else 0
                             div_val = q2f(d.dividend_net)
@@ -141,20 +138,17 @@ def main():
                                 "date": "сегодня" if r_date == today else "завтра"
                             })
                 except Exception:
-                    pass # Игнорируем ошибки по отдельным бумагам
+                    pass
 
-        # Сортируем акции по доходности и берем топ-5
         stocks_events = sorted(stocks_events, key=lambda x: x['yield_pct'], reverse=True)[:5]
 
         # === 2. КУПОНЫ ПО ОБЛИГАЦИЯМ ===
         try:
-            bonds_resp = client.instruments.bonds(instrument_status=1) # BASE
+            bonds_resp = client.instruments.bonds(instrument_status=1)
             for b in bonds_resp.instruments:
-                # Фильтр по надежным эмитентам
                 if not any(issuer.lower() in b.name.lower() for issuer in RELIABLE_ISSUERS):
                     continue
                 
-                # Ищем купоны на сегодня/завтра
                 try:
                     from_dt = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
                     to_dt = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
@@ -165,7 +159,6 @@ def main():
                         if c_date in (today, tomorrow):
                             coupon_val = q2f(c.pay_one_bond)
                             
-                            # Ищем НКД на сегодня
                             nkd_val = 0.0
                             try:
                                 nkd_resp = client.instruments.get_accrued_interests(figi=b.figi, from_=from_dt, to=from_dt)
@@ -173,8 +166,17 @@ def main():
                                     nkd_val = q2f(nkd_resp.accrued_interests[0].value)
                             except: pass
 
+                            # ИСПРАВЛЕНИЕ: Делаем нормальное отображаемое имя
+                            raw_ticker = b.ticker if b.ticker else ""
+                            if raw_ticker.startswith("RU") or not raw_ticker:
+                                # Берем название, обрезаем до 15 символов
+                                display_name = b.name[:15].strip()
+                            else:
+                                display_name = raw_ticker
+
                             bonds_events.append({
-                                "ticker": b.ticker,
+                                "ticker": raw_ticker,
+                                "display_name": display_name,
                                 "name": b.name,
                                 "coupon_value": coupon_val,
                                 "nkd": nkd_val,
@@ -185,10 +187,8 @@ def main():
         except Exception as e:
             log.error(f"Ошибка получения облигаций: {e}")
 
-        # Сортируем облигации по размеру купона и берем топ-5
         bonds_events = sorted(bonds_events, key=lambda x: x['coupon_value'], reverse=True)[:5]
 
-    # Если вообще ничего нет — выходим
     if not stocks_events and not bonds_events:
         log.info("Нет выплат на сегодня/завтра. Пост не отправлен.")
         sys.exit(0)
@@ -209,10 +209,11 @@ def main():
     if bonds_events:
         text += "🏦 <b>Купоны (облигации):</b>\n"
         for b in bonds_events:
+            # В тексте тоже используем display_name
             if b['date'] == "сегодня":
-                text += f"• <b>{b['ticker']}</b> — Купон: {format_money(b['coupon_value'])} ₽ | НКД: {format_money(b['nkd'])} ₽\n"
+                text += f"• <b>{b['display_name']}</b> — Купон: {format_money(b['coupon_value'])} ₽ | НКД: {format_money(b['nkd'])} ₽\n"
             else:
-                text += f"• <b>{b['ticker']}</b> — <i>Завтра</i> купон: {format_money(b['coupon_value'])} ₽\n"
+                text += f"• <b>{b['display_name']}</b> — <i>Завтра</i> купон: {format_money(b['coupon_value'])} ₽\n"
         text += "\n"
 
     text += "⚠️ <i>Не ИИР. Торговля — риск. Налог 13% удерживается автоматически.</i>"
