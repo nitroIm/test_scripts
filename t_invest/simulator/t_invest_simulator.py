@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from t_tech.invest import Client
 from t_tech.invest.constants import INVEST_GRPC_API_SANDBOX
-from t_tech.invest.schemas import CandleInterval, OrderDirection, OrderType
+from t_tech.invest.schemas import CandleInterval, OrderDirection, OrderType, MoneyValue
 from t_tech.invest.utils import now
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -29,10 +29,7 @@ NEWS_SCORES_FILE = Path("t_invest/data/news/t_invest_news_scores.json")
 
 FEATURE_COLS = ["open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_21", "macd_hist", "ema_20", "ema_50", "ema_200", "vol_sma", "atr_7", "atr_14", "atr_50", "atr_100", "price_change_1h", "price_change_4h", "price_change_24h"]
 
-# АГРЕССИВНЫЙ ПОРОГ ДЛЯ ВХОДА
 MIN_PROBABILITY = 0.35
-
-# БЛОКИРУЕМ ТОЛЬКО СИЛЬНЫЙ НЕГАТИВ
 NEWS_BLOCK_THRESHOLD = -0.5 
 
 KLG_TZ = timezone(timedelta(hours=2))
@@ -63,7 +60,7 @@ def compute_features(df):
     df['price_change_1h'] = df['close'].pct_change(1); df['price_change_4h'] = df['close'].pct_change(4); df['price_change_24h'] = df['close'].pct_change(24)
     return df
 
-def fetch_h1_candles(client, figi, count=720): # УВЕЛИЧИЛИ ЗАПРОС ДО 720 ЧАСОВ (30 ДНЕЙ)
+def fetch_h1_candles(client, figi, count=720):
     try:
         resp = client.market_data.get_candles(figi=figi, from_=now()-timedelta(hours=count), to=now(), interval=CandleInterval.CANDLE_INTERVAL_HOUR)
         rows = [{"time": c.time, "open": q2f(c.open), "high": q2f(c.high), "low": q2f(c.low), "close": q2f(c.close), "volume": c.volume} for c in resp.candles]
@@ -130,19 +127,10 @@ def main():
     models = {}
     if cfg_intraday and cfg_intraday.get("model_path"):
         p = cfg_intraday["model_path"]
-        if Path(p).exists(): 
-            models["intraday"] = joblib.load(p)
-            log.info(f"Loaded model intraday: {p}")
-        else:
-            log.error(f"Model intraday NOT FOUND: {p}")
-            
+        if Path(p).exists(): models["intraday"] = joblib.load(p)
     if cfg_swing and cfg_swing.get("model_path"):
         p = cfg_swing["model_path"]
-        if Path(p).exists(): 
-            models["swing"] = joblib.load(p)
-            log.info(f"Loaded model swing: {p}")
-        else:
-            log.error(f"Model swing NOT FOUND: {p}")
+        if Path(p).exists(): models["swing"] = joblib.load(p)
 
     with Client(TOKEN, target=INVEST_GRPC_API_SANDBOX) as client:
         accounts = client.users.get_accounts()
@@ -157,6 +145,29 @@ def main():
         else:
             acc_id = accounts.accounts[0].id
 
+        # === ПРОВЕРКА БАЛАНСА И ПОПОЛНЕНИЕ ТОЛЬКО ПРИ НУЛЕ ===
+        try:
+            positions = client.operations.get_positions(account_id=acc_id)
+            rub_balance = 0.0
+            for m in positions.money:
+                if m.currency == "rub":
+                    rub_balance = q2f(m)
+                    break
+            
+            if rub_balance < 10: # Если счет пуст (меньше 10 рублей)
+                client.sandbox.sandbox_pay_in(
+                    account_id=acc_id,
+                    amount=MoneyValue(units=10000, nano=0), # 10 000 рублей
+                    currency="rub"
+                )
+                log.info(f"Баланс был пуст. Пополнено на 10 000 ₽. (Аккаунт: {acc_id})")
+                rub_balance = 10000.0
+            else:
+                log.info(f"Текущий баланс песочницы: {rub_balance:.2f} ₽. Пополнение не требуется.")
+                
+        except Exception as e:
+            log.warning(f"Не удалось проверить/пополнить баланс: {e}")
+
         for ticker in tickers:
             figi = figi_map.get(ticker)
             if not figi: continue
@@ -166,13 +177,11 @@ def main():
 
             df_h1 = fetch_h1_candles(client, figi)
             if len(df_h1) < 200: 
-                log.warning(f"{ticker}: Мало свечей ({len(df_h1)}) для расчета индикаторов. Пропуск.")
                 continue
                 
             last_candle_time = df_h1.iloc[-1]['time'].isoformat()
             df_h1 = compute_features(df_h1).dropna()
             if df_h1.empty: 
-                log.warning(f"{ticker}: Таблица пуста после dropna(). Пропуск.")
                 continue
                 
             last_candle = df_h1.iloc[-1]
@@ -228,7 +237,6 @@ def main():
                             signal = 1
                             prob = 1.0
 
-                    # ЛОГИРУЕМ ВЕРОЯТНОСТЬ ВСЕГДА
                     news_data = news_scores.get(ticker, {})
                     news_score = news_data.get("score", 0.0) if isinstance(news_data, dict) else 0.0
                     
