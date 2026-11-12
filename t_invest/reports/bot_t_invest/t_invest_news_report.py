@@ -20,9 +20,11 @@ WHITELIST_FILE = "t_invest/data/scanner/whitelist.json"
 
 KLG_TZ = timezone(timedelta(hours=2))
 
+# Стоп-слова для заголовков, которые не несут смысла для трейдера
+STOP_WORDS = ["итоги торгов", "анонс", "обзор", "краткий обзор", "лидеры роста", "лидеры падения"]
+
 def send_telegram_message(text):
     if not TOKEN or not CHAT_ID: 
-        log.error("Нет TG токена или ID")
         return False
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True}
@@ -34,35 +36,39 @@ def send_telegram_message(text):
         return False
 
 def get_score_text(score):
-    if score >= 0.7: return "🔴 Сильный позитив"
+    # ИСПРАВЛЕНЫ ЦВЕТА
+    if score >= 0.7: return "🟢 Сильный позитив"
     if score > 0: return "🟢 Позитив"
     if score <= -0.7: return "🔴 Сильный негатив"
     return "🔴 Негатив"
 
+def is_trash(title):
+    title_lower = title.lower()
+    return any(word in title_lower for word in STOP_WORDS)
+
 def get_news_title(ticker, news_list):
-    # Сортируем новости от новых к старым
     sorted_news = sorted(news_list, key=lambda x: x.get('ts', ''), reverse=True)
     
     for news in sorted_news:
         tickers = news.get('tickers', [])
         title = news.get('title', '')
         
-        if not title: continue
+        if not title or is_trash(title): continue
         if len(tickers) > 5: continue # Пропускаем общие обзоры рынка
 
         if ticker == "_MARKET_":
-            # Для макро берем как раз обзоры рынка
-            if len(tickers) > 5:
+            # Для макро берем обзоры рынка (где >5 тикеров)
+            if len(tickers) > 5 and not is_trash(title):
                 return title
         else:
-            # Для акции ищем новость, где есть этот тикер и мало других
+            # Для конкретной акции, где мало тикеров и это не мусор
             if ticker in tickers and len(tickers) <= 3:
                 return title
     return ""
 
 def main():
     if not os.path.exists(NEWS_SCORES_FILE) or not os.path.exists(NEWS_COLLECTOR_FILE) or not os.path.exists(WHITELIST_FILE):
-        log.error("Один из файлов (scores, collector, whitelist) не найден")
+        log.error("Один из файлов не найден")
         sys.exit(1)
 
     with open(NEWS_SCORES_FILE, "r", encoding="utf-8") as f:
@@ -77,13 +83,11 @@ def main():
     macro_news = []
     stock_news = []
 
-    # 1. Разбираем скоры
     for ticker, info in scores_data.items():
         if not isinstance(info, dict): continue
         score = info.get("score", 0.0)
         
-        # Отсекаем нейтральный шум
-        if abs(score) < 0.15: continue
+        if abs(score) < 0.15: continue # Отсекаем нейтральный шум
 
         if ticker == "_MARKET_":
             title = get_news_title("_MARKET_", news_data)
@@ -92,7 +96,6 @@ def main():
             title = get_news_title(ticker, news_data)
             if title: stock_news.append({"ticker": ticker, "score": score, "title": title})
 
-    # 2. Сортируем и берем топы
     macro_news = sorted(macro_news, key=lambda x: abs(x['score']), reverse=True)[:2]
     stock_news = sorted(stock_news, key=lambda x: abs(x['score']), reverse=True)[:5]
 
@@ -100,7 +103,6 @@ def main():
         log.info("Нет подходящих новостей. Пост не отправлен.")
         sys.exit(0)
 
-    # 3. Формируем текст
     now_klg = datetime.now(KLG_TZ).strftime("%d.%m.%Y %H:%M")
     text = f"⚡️ <b>Главное сейчас | {now_klg}</b>\n\n"
 
@@ -119,13 +121,10 @@ def main():
 
     text += "⚠️ <i>Не ИИР. Торговля — риск.</i>"
 
-    # 4. Отправляем
-    log.info("Отправка в Telegram...")
     if send_telegram_message(text):
         log.info("Новостной дайджест успешно отправлен.")
     else:
         log.error("Ошибка отправки в Telegram.")
-        sys.exit(1)
 
 if __name__ == "__main__":
     main()
