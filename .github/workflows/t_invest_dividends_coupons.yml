@@ -1,0 +1,31 @@
+name: T-Invest Dividends Coupons
+
+on:
+  workflow_dispatch: # Только ручной запуск или внешний триггер через cron-job.org
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install t-tech-investments==1.49.3 --index-url https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple --trusted-host opensource.tbank.ru
+          pip install requests==2.32.3 matplotlib==3.8.4
+          
+      - name: Run Script
+        env:
+          T_INVEST_TOKEN: ${{ secrets.T_INVEST_TOKEN }}
+          INVEST_BOT_TOKEN: ${{ secrets.INVEST_BOT_TOKEN }}
+          TG_T_INVEST_CHANNEL: ${{ secrets.TG_T_INVEST_CHANNEL }}
+          SSL_TBANK_VERIFY: True
+        run: |
+          python t_invest/reports/bot_t_invest/t_invest_dividends_coupons.py
