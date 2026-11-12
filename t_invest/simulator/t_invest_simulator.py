@@ -130,10 +130,19 @@ def main():
     models = {}
     if cfg_intraday and cfg_intraday.get("model_path"):
         p = cfg_intraday["model_path"]
-        if Path(p).exists(): models["intraday"] = joblib.load(p)
+        if Path(p).exists(): 
+            models["intraday"] = joblib.load(p)
+            log.info(f"Loaded model intraday: {p}")
+        else:
+            log.error(f"Model intraday NOT FOUND: {p}")
+            
     if cfg_swing and cfg_swing.get("model_path"):
         p = cfg_swing["model_path"]
-        if Path(p).exists(): models["swing"] = joblib.load(p)
+        if Path(p).exists(): 
+            models["swing"] = joblib.load(p)
+            log.info(f"Loaded model swing: {p}")
+        else:
+            log.error(f"Model swing NOT FOUND: {p}")
 
     if "08:45" <= current_klg <= "08:50":
         modes = ", ".join(models.keys())
@@ -198,9 +207,6 @@ def main():
 
                 # === ВХОД ===
                 if pos_key not in state["positions"]:
-                    if state["last_h1_candle"].get(pos_key) == last_candle_time:
-                        continue 
-                    
                     model = models.get(mode)
                     signal = 0
                     prob = 0.0
@@ -220,14 +226,21 @@ def main():
                             signal = 1
                             prob = 1.0
 
-                    state["last_h1_candle"][pos_key] = last_candle_time
+                    # ИЗМЕНЕНИЕ: Убрали continue, чтобы prob всегда выводился в лог
+                    # state["last_h1_candle"][pos_key] = last_candle_time
                     
                     # ЛОГИРУЕМ ВЕРОЯТНОСТЬ ВСЕГДА
                     news_data = news_scores.get(ticker, {})
                     news_score = news_data.get("score", 0.0)
-                    log.info(f"{pos_key}: prob={prob:.2f}, news={news_score}")
+                    
+                    log.info(f"{pos_key}: prob={prob:.2f}, news={news_score:.2f}, signal={signal}, last_candle={last_candle_time}")
 
                     if signal == 1:
+                        # Дополнительная защита от повторной покупки на той же свече
+                        if state["last_h1_candle"].get(pos_key) == last_candle_time:
+                            log.info(f"{pos_key} Сигнал есть, но позиция на этой свече уже открывалась. Пропуск.")
+                            continue
+
                         if news_score < NEWS_BLOCK_THRESHOLD:
                             log.info(f"{pos_key} SIGNAL! Но новости плохие ({news_score}). Пропуск.")
                             send_tg(f"⚠️ <b>ОТМЕНА ПОКУПКИ {ticker} ({mode.upper()})</b>\nТехсигнал есть, но новостной фон негативный (Скор: {news_score}).")
@@ -247,6 +260,7 @@ def main():
                                 "trailing_stop": sl_price, "highest": entry_price,
                                 "exit_time": exit_time.isoformat(), "figi": figi
                             }
+                            state["last_h1_candle"][pos_key] = last_candle_time # Записываем свечу только при покупке
                             history.append({"ticker": ticker, "mode": mode, "type": "BUY", "price": round(entry_price, 2), "time": now_time.isoformat(), "reason": "SIGNAL", "pnl_pct": 0.0})
                             send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nTP: {tp_price:.2f}₽ (+{cfg['params']['tp_pct']}%)\nSL: {sl_price:.2f}₽ (-{cfg['params']['sl_pct']}%)\nВероятность: {prob*100:.0f}%\nНовости: {news_score}\nВремя: {current_klg} КЛГ")
                         except Exception as e: log.error(f"Buy error {pos_key}: {e}")
