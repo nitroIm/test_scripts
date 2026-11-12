@@ -108,11 +108,17 @@ def main():
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     state = {"positions": {}, "last_h1_candle": {}, "deposited": False, "alert_sent": False}
     if STATE_FILE.exists():
-        with open(STATE_FILE) as f: state = json.load(f)
+        try:
+            with open(STATE_FILE) as f: state = json.load(f)
+            if "deposited" not in state: state["deposited"] = False
+            if "alert_sent" not in state: state["alert_sent"] = False
+        except: pass
         
     history = []
     if HISTORY_FILE.exists():
-        with open(HISTORY_FILE) as f: history = json.load(f)
+        try:
+            with open(HISTORY_FILE) as f: history = json.load(f)
+        except: pass
     
     news_scores = load_news_scores()
     now_time = datetime.now(timezone.utc)
@@ -160,12 +166,14 @@ def main():
             else:
                 log.info(f"Текущий баланс: {rub_balance:.2f} ₽. Пополнение отключено.")
                 
-            # Если баланс восстановился, сбрасываем флаг тревоги
             if rub_balance > 1000:
                 state["alert_sent"] = False
                 
         except Exception as e:
             log.warning(f"Не удалось проверить/пополнить баланс: {e}")
+
+        # Если денег нет, но есть открытые позиции, возможно, они еще не проданы. Но в песочнице деньги возвращаются при продаже.
+        # Так что просто идем дальше.
 
         for ticker in tickers:
             figi = figi_map.get(ticker)
@@ -251,11 +259,13 @@ def main():
                         
                         trade_cost = current_price * lot
                         if rub_balance < trade_cost:
-                            log.warning(f"{pos_key} SIGNAL! Но недостаточно средств (нужно {trade_cost:.2f}₽, есть {rub_balance:.2f}₽).")
-                            # Отправляем тревогу только 1 раз
-                            if not state.get("alert_sent", False):
+                            # Если денег нет ВООБЩЕ (меньше 100 рублей), шлем алерт
+                            if rub_balance < 100 and not state.get("alert_sent", False):
+                                log.warning(f"{pos_key} Баланс критический ({rub_balance:.2f}₽). Требуется пополнение.")
                                 send_tg(f"⚠️ <b>ВНИМАНИЕ! ДЕНЬГИ ЗАКОНЧИЛИСЬ</b>\n\nБаланс песочницы упал до {rub_balance:.2f} ₽.\nДля совершения новых сделок необходимо пополнить счет.")
                                 state["alert_sent"] = True
+                            else:
+                                log.warning(f"{pos_key} SIGNAL! Но не хватает на лот (нужно {trade_cost:.2f}₽, есть {rub_balance:.2f}₽). Пропуск.")
                             continue
                         
                         log.info(f"{pos_key} SIGNAL! Buying...")
