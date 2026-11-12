@@ -6,8 +6,8 @@
       "qty": 1,
       "tp": 26.935200000000002,
       "sl": 24.1918,
-      "trailing_stop": 24.5659,
-      "highest": 24.94,
+      "trailing_stop": 24.5856,
+      "highest": 24.96,
       "exit_time": "2026-11-13T14:29:40.854757+00:00",
       "figi": "TCS50A10C1L6"
     },
@@ -17,8 +17,8 @@
       "qty": 1,
       "tp": 246.585,
       "sl": 239.3325,
-      "trailing_stop": 240.54125,
-      "highest": 241.75,
+      "trailing_stop": 240.64075,
+      "highest": 241.85,
       "exit_time": "2026-11-13T02:29:40.854757+00:00",
       "figi": "TCS00A106YF0"
     },
@@ -44,17 +44,6 @@
       "exit_time": "2026-11-13T14:29:40.854757+00:00",
       "figi": "BBG004S68CP5"
     },
-    "EUTR_intraday": {
-      "side": "long",
-      "entry": 13.5,
-      "qty": 1,
-      "tp": 13.77,
-      "sl": 13.365,
-      "trailing_stop": 13.48225,
-      "highest": 13.55,
-      "exit_time": "2026-11-13T02:29:40.854757+00:00",
-      "figi": "TCS00A1002V2"
-    },
     "LSRG_intraday": {
       "side": "long",
       "entry": 920.4,
@@ -76,6 +65,17 @@
       "highest": 920.4,
       "exit_time": "2026-11-13T14:29:40.854757+00:00",
       "figi": "BBG004S68C39"
+    },
+    "EUTR_swing": {
+      "side": "long",
+      "entry": 13.45,
+      "qty": 1,
+      "tp": 14.526,
+      "sl": 13.046499999999998,
+      "trailing_stop": 13.046499999999998,
+      "highest": 13.45,
+      "exit_time": "2026-11-13T14:46:17.657193+00:00",
+      "figi": "TCS00A1002V2"
     }
   },
   "last_h1_candle": {
@@ -85,7 +85,8 @@
     "MVID_swing": "2026-11-12T14:00:00+00:00",
     "EUTR_intraday": "2026-11-12T14:00:00+00:00",
     "LSRG_intraday": "2026-11-12T14:00:00+00:00",
-    "LSRG_swing": "2026-11-12T14:00:00+00:00"
+    "LSRG_swing": "2026-11-12T14:00:00+00:00",
+    "EUTR_swing": "2026-11-12T14:00:00+00:00"
   },
   "deposit_v3": true,
   "alert_sent_v3": false

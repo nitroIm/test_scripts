@@ -61,5 +61,25 @@
     "time": "2026-11-12T14:29:40.854757+00:00",
     "reason": "SIGNAL",
     "pnl_pct": 0.0
+  },
+  {
+    "ticker": "EUTR",
+    "mode": "intraday",
+    "type": "SELL",
+    "price": 13.45,
+    "entry": 13.5,
+    "time": "2026-11-12T14:46:17.657193+00:00",
+    "reason": "TRAILING_STOP",
+    "pnl_pct": -0.37,
+    "pnl_rub": -0.05
+  },
+  {
+    "ticker": "EUTR",
+    "mode": "swing",
+    "type": "BUY",
+    "price": 13.45,
+    "time": "2026-11-12T14:46:17.657193+00:00",
+    "reason": "SIGNAL",
+    "pnl_pct": 0.0
   }
 ]
