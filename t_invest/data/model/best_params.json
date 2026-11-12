@@ -1,30 +1,30 @@
 {
   "trainer_version": "7.0-long-only-report-sep",
-  "updated_at": "2026-11-11T06:31:34.012155+00:00",
+  "updated_at": "2026-11-12T06:31:24.113528+00:00",
   "long_tickers": [
     "VKCO",
     "MVID",
+    "EUTR",
     "LSRG",
-    "ETLN",
-    "SMLT"
+    "ETLN"
   ],
   "intraday": {
     "long": {
       "params": {
         "tp_pct": 2.0,
-        "sl_pct": 0.5,
+        "sl_pct": 1.0,
         "time_exit_h": 12,
-        "model_type": "logreg"
+        "model_type": "rf"
       },
       "metrics": {
-        "trades": 139,
-        "pnl": 4.15,
-        "winrate": 0.4245,
-        "max_dd": -2.54,
-        "score": 1.63
+        "trades": 107,
+        "pnl": 2.84,
+        "winrate": 0.514,
+        "max_dd": -2.07,
+        "score": 1.37
       },
       "model_path": "t_invest/data/model/best_intraday_long.pkl",
-      "source": "model_logreg"
+      "source": "model_rf"
     }
   },
   "swing": {
@@ -36,18 +36,18 @@
         "model_type": "logreg"
       },
       "metrics": {
-        "trades": 48,
-        "pnl": 9.8,
-        "winrate": 0.5,
-        "max_dd": -2.11,
-        "score": 4.65
+        "trades": 31,
+        "pnl": 8.4,
+        "winrate": 0.5806,
+        "max_dd": -1.23,
+        "score": 6.83
       },
       "model_path": "t_invest/data/model/best_swing_long.pkl",
       "source": "model_logreg"
     }
   },
   "stats": {
-    "total_rows": 7961,
-    "elapsed_seconds": 948
+    "total_rows": 7933,
+    "elapsed_seconds": 959
   }
 }
