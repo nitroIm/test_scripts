@@ -31,7 +31,6 @@ FEATURE_COLS = ["open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_2
 
 MIN_PROBABILITY = 0.35
 NEWS_BLOCK_THRESHOLD = -0.5 
-
 KLG_TZ = timezone(timedelta(hours=2))
 
 def send_tg(text):
@@ -80,15 +79,11 @@ def get_last_price(client, figi):
     return 0.0
 
 def load_news_scores():
-    if not NEWS_SCORES_FILE.exists():
-        log.warning("News scores file not found. Trading without news filter.")
-        return {}
+    if not NEWS_SCORES_FILE.exists(): return {}
     try:
         with open(NEWS_SCORES_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception as e:
-        log.error(f"Error loading news scores: {e}")
-        return {}
+    except Exception as e: return {}
 
 def main():
     log.info("STARTING SIMULATOR (WITH NEWS FILTER)")
@@ -111,7 +106,7 @@ def main():
     if cfg_intraday: tickers.update(params_data.get("long_tickers", []))
     
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    state = {"positions": {}, "last_h1_candle": {}}
+    state = {"positions": {}, "last_h1_candle": {}, "deposited": False, "alert_sent": False}
     if STATE_FILE.exists():
         with open(STATE_FILE) as f: state = json.load(f)
         
@@ -120,7 +115,6 @@ def main():
         with open(HISTORY_FILE) as f: history = json.load(f)
     
     news_scores = load_news_scores()
-
     now_time = datetime.now(timezone.utc)
     current_klg = now_time.astimezone(KLG_TZ).strftime("%H:%M")
 
@@ -145,25 +139,30 @@ def main():
         else:
             acc_id = accounts.accounts[0].id
 
-        # === ПРОВЕРКА БАЛАНСА И ПОПОЛНЕНИЕ ТОЛЬКО ПРИ НУЛЕ ===
+        rub_balance = 0.0
         try:
             positions = client.operations.get_positions(account_id=acc_id)
-            rub_balance = 0.0
             for m in positions.money:
                 if m.currency == "rub":
                     rub_balance = q2f(m)
                     break
-            
-            if rub_balance < 10: # Если счет пуст (меньше 10 рублей)
-                client.sandbox.sandbox_pay_in(
-                    account_id=acc_id,
-                    amount=MoneyValue(units=10000, nano=0), # 10 000 рублей
-                    currency="rub"
-                )
-                log.info(f"Баланс был пуст. Пополнено на 10 000 ₽. (Аккаунт: {acc_id})")
-                rub_balance = 10000.0
+
+            if not state.get("deposited", False):
+                if rub_balance < 10:
+                    client.sandbox.sandbox_pay_in(
+                        account_id=acc_id,
+                        amount=MoneyValue(units=10000, nano=0),
+                        currency="rub"
+                    )
+                    log.info(f"Первый запуск. Баланс пополнен на 10 000 ₽.")
+                    rub_balance = 10000.0
+                state["deposited"] = True
             else:
-                log.info(f"Текущий баланс песочницы: {rub_balance:.2f} ₽. Пополнение не требуется.")
+                log.info(f"Текущий баланс: {rub_balance:.2f} ₽. Пополнение отключено.")
+                
+            # Если баланс восстановился, сбрасываем флаг тревоги
+            if rub_balance > 1000:
+                state["alert_sent"] = False
                 
         except Exception as e:
             log.warning(f"Не удалось проверить/пополнить баланс: {e}")
@@ -176,15 +175,14 @@ def main():
             if current_price <= 0: continue
 
             df_h1 = fetch_h1_candles(client, figi)
-            if len(df_h1) < 200: 
-                continue
+            if len(df_h1) < 200: continue
                 
             last_candle_time = df_h1.iloc[-1]['time'].isoformat()
             df_h1 = compute_features(df_h1).dropna()
-            if df_h1.empty: 
-                continue
+            if df_h1.empty: continue
                 
             last_candle = df_h1.iloc[-1]
+            lot = next((s['lot'] for s in wl_stocks if s['ticker'] == ticker), 1)
 
             for mode, cfg in [("intraday", cfg_intraday), ("swing", cfg_swing)]:
                 if not cfg: continue
@@ -209,7 +207,8 @@ def main():
                         try:
                             client.sandbox.post_sandbox_order(figi=figi, quantity=pos["qty"], direction=OrderDirection.ORDER_DIRECTION_SELL, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
                             pnl_pct = (current_price - pos["entry"]) / pos["entry"] * 100
-                            pnl_rub = (current_price - pos["entry"]) * pos["qty"]
+                            pnl_rub = (current_price - pos["entry"]) * pos["qty"] * lot
+                            rub_balance += (current_price * pos["qty"] * lot)
                             emoji = "🟢" if pnl_pct > 0 else "🔴"
                             history.append({"ticker": ticker, "mode": mode, "type": "SELL", "price": round(current_price, 2), "entry": round(pos["entry"], 2), "time": now_time.isoformat(), "reason": exit_reason, "pnl_pct": round(pnl_pct, 2), "pnl_rub": round(pnl_rub, 2)})
                             send_tg(f"{emoji} <b>ПРОДАЖА {ticker} ({mode.upper()})</b>\nПричина: {exit_reason}\nВход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\nPnL: {pnl_pct:+.2f}% ({pnl_rub:+.2f}₽)\nВремя: {current_klg} КЛГ")
@@ -240,7 +239,7 @@ def main():
                     news_data = news_scores.get(ticker, {})
                     news_score = news_data.get("score", 0.0) if isinstance(news_data, dict) else 0.0
                     
-                    log.info(f"{pos_key}: prob={prob:.2f}, news={news_score:.2f}, signal={signal}")
+                    log.info(f"{pos_key}: prob={prob:.2f}, news={news_score:.2f}, signal={signal}, balance={rub_balance:.2f}")
 
                     if signal == 1:
                         if state["last_h1_candle"].get(pos_key) == last_candle_time:
@@ -248,6 +247,15 @@ def main():
 
                         if news_score < NEWS_BLOCK_THRESHOLD:
                             log.info(f"{pos_key} SIGNAL! Но новости плохие ({news_score}). Пропуск.")
+                            continue
+                        
+                        trade_cost = current_price * lot
+                        if rub_balance < trade_cost:
+                            log.warning(f"{pos_key} SIGNAL! Но недостаточно средств (нужно {trade_cost:.2f}₽, есть {rub_balance:.2f}₽).")
+                            # Отправляем тревогу только 1 раз
+                            if not state.get("alert_sent", False):
+                                send_tg(f"⚠️ <b>ВНИМАНИЕ! ДЕНЬГИ ЗАКОНЧИЛИСЬ</b>\n\nБаланс песочницы упал до {rub_balance:.2f} ₽.\nДля совершения новых сделок необходимо пополнить счет.")
+                                state["alert_sent"] = True
                             continue
                         
                         log.info(f"{pos_key} SIGNAL! Buying...")
@@ -258,6 +266,8 @@ def main():
                             sl_price = entry_price * (1 - cfg["params"]["sl_pct"] / 100)
                             exit_time = now_time + timedelta(hours=cfg["params"]["time_exit_h"])
                             
+                            rub_balance -= trade_cost
+                            
                             state["positions"][pos_key] = {
                                 "side": "long", "entry": entry_price, "qty": 1,
                                 "tp": tp_price, "sl": sl_price,
@@ -266,7 +276,7 @@ def main():
                             }
                             state["last_h1_candle"][pos_key] = last_candle_time
                             history.append({"ticker": ticker, "mode": mode, "type": "BUY", "price": round(entry_price, 2), "time": now_time.isoformat(), "reason": "SIGNAL", "pnl_pct": 0.0})
-                            send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nTP: {tp_price:.2f}₽ (+{cfg['params']['tp_pct']}%)\nSL: {sl_price:.2f}₽ (-{cfg['params']['sl_pct']}%)\nВероятность: {prob*100:.0f}%\nНовости: {news_score}\nВремя: {current_klg} КЛГ")
+                            send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nЛот: {lot} шт.\nTP: {tp_price:.2f}₽\nSL: {sl_price:.2f}₽\nВероятность: {prob*100:.0f}%\nОстаток баланса: {rub_balance:.2f}₽\nВремя: {current_klg} КЛГ")
                         except Exception as e: log.error(f"Buy error {pos_key}: {e}")
 
     with open(STATE_FILE, "w") as f: json.dump(state, f, indent=2, default=str)
