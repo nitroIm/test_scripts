@@ -127,7 +127,6 @@ def main():
     news_scores = load_news_scores()
     now_time = datetime.now(timezone.utc)
     
-    # Форматируем красивое время для Telegram (МСК+1 / Калининград)
     current_klg = now_time.astimezone(KLG_TZ).strftime("%d.%m.%Y %H:%M")
 
     models = {}
@@ -218,20 +217,30 @@ def main():
                         try:
                             client.sandbox.post_sandbox_order(figi=figi, quantity=pos["qty"], direction=OrderDirection.ORDER_DIRECTION_SELL, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
                             
-                            entry_time = datetime.fromisoformat(pos["entry_time"])
+                            # Защита от старых позиций без entry_time
+                            entry_time_str = pos.get("entry_time", now_time.isoformat())
+                            entry_time = datetime.fromisoformat(entry_time_str)
                             duration_hours = round((now_time - entry_time).total_seconds() / 3600, 2)
                             
                             pnl_pct = (current_price - pos["entry"]) / pos["entry"] * 100
                             pnl_rub = (current_price - pos["entry"]) * pos["qty"] * lot
                             rub_balance += (current_price * pos["qty"] * lot)
-                            emoji = "🟢" if pnl_pct > 0 else "🔴"
                             
-                            # Формируем запись для аудита
+                            # Определение результата
+                            result_str = "WIN" if pnl_pct > 0 else "LOSS"
+                            if result_str == "WIN":
+                                emoji = "✅"
+                                title = "СДЕЛКА ЗАКРЫТА В ПЛЮС"
+                            else:
+                                emoji = "❌"
+                                title = "СДЕЛКА ЗАКРЫТА В МИНУС"
+                            
                             trade_record = {
                                 "ticker": ticker,
                                 "mode": mode,
                                 "type": "SELL",
-                                "entry_time": pos["entry_time"],
+                                "result": result_str,
+                                "entry_time": entry_time_str,
                                 "entry_price": round(pos["entry"], 2),
                                 "entry_prob": pos.get("entry_prob", 0.0),
                                 "exit_time": now_time.isoformat(),
@@ -243,13 +252,11 @@ def main():
                                 "balance_after": round(rub_balance, 2)
                             }
                             
-                            # Пишем в лог специальную метку для будущего парсера аудита
                             log.info(f"AUDIT_TRADE: {json.dumps(trade_record)}")
-                            
                             history.append(trade_record)
                             
                             send_tg(
-                                f"{emoji} <b>ПРОДАЖА {ticker} ({mode.upper()})</b>\n"
+                                f"{emoji} <b>{title} {ticker} ({mode.upper()})</b>\n"
                                 f"Причина: {exit_reason}\n"
                                 f"Вход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\n"
                                 f"Держали: {duration_hours} ч.\n"
@@ -316,8 +323,8 @@ def main():
                             
                             state["positions"][pos_key] = {
                                 "side": "long", "entry": entry_price, "qty": 1,
-                                "entry_time": now_time.isoformat(), # НОВОЕ ПОЛЕ
-                                "entry_prob": prob,                 # НОВОЕ ПОЛЕ
+                                "entry_time": now_time.isoformat(),
+                                "entry_prob": prob,
                                 "tp": tp_price, "sl": sl_price,
                                 "trailing_stop": sl_price, "highest": entry_price,
                                 "exit_time": exit_time.isoformat(), "figi": figi
