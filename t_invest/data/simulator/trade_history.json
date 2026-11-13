@@ -329,5 +329,53 @@
     "pnl_pct": -0.49,
     "pnl_rub": -0.12,
     "balance_after": 7582.26
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-13T07:01:35.046200+00:00",
+    "entry_price": 53.3,
+    "entry_prob": 0.3769926976344052,
+    "exit_time": "2026-11-13T07:31:23.434203+00:00",
+    "exit_price": 55.5,
+    "reason": "TAKE_PROFIT",
+    "duration_hours": 0.5,
+    "pnl_pct": 4.13,
+    "pnl_rub": 2.2,
+    "balance_after": 7637.69
+  },
+  {
+    "ticker": "VKCO",
+    "mode": "intraday",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-13T07:01:35.046200+00:00",
+    "entry_price": 235.15,
+    "entry_prob": 0.4748267454171128,
+    "exit_time": "2026-11-13T07:31:23.434203+00:00",
+    "exit_price": 234.45,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.5,
+    "pnl_pct": -0.3,
+    "pnl_rub": -0.7,
+    "balance_after": 7872.14
+  },
+  {
+    "ticker": "EUTR",
+    "mode": "swing",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-13T07:01:35.046200+00:00",
+    "entry_price": 15.6,
+    "entry_prob": 0.3940398369752185,
+    "exit_time": "2026-11-13T07:31:23.434203+00:00",
+    "exit_price": 15.25,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.5,
+    "pnl_pct": -2.24,
+    "pnl_rub": -0.35,
+    "balance_after": 7887.39
   }
 ]
