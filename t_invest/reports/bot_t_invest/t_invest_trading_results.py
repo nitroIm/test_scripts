@@ -49,7 +49,7 @@ def send_telegram_photo(photo_buf, caption):
 
 def create_pnl_chart(intraday_pnl, swing_pnl):
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(8, 5), facecolor='#1a1a1a')
+    fig, ax = plt.subplots(figsize=(10, 5), facecolor='#1a1a1a')
     ax.set_facecolor('#1a1a1a')
 
     labels = ['Intraday', 'Swing']
@@ -61,16 +61,9 @@ def create_pnl_chart(intraday_pnl, swing_pnl):
     # Линия нуля
     ax.axhline(0, color='#555555', linewidth=1, zorder=0)
 
-    # Подписи на столбиках
-    for bar in bars:
-        height = bar.get_height()
-        # Определяем, куда ставить текст (сверху или снизу)
-        y_pos = height + (100 if height >= 0 else -100)
-        va = 'bottom' if height >= 0 else 'top'
-        
-        ax.text(bar.get_x() + bar.get_width()/2, y_pos, 
-                f'{height:+.2f} ₽', ha='center', va=va, 
-                color='white', fontweight='bold', fontsize=14)
+    # Автоматически подписываем столбики (сверху или снизу)
+    # Это самый надежный способ, он не ломает масштаб оси
+    ax.bar_label(bars, fmt='%+.2f ₽', padding=5, color='white', fontsize=14, fontweight='bold')
 
     ax.set_title("Результат за день по режимам", color='#ffffff', pad=20, fontsize=16, fontweight='bold')
     
@@ -82,6 +75,10 @@ def create_pnl_chart(intraday_pnl, swing_pnl):
     
     ax.tick_params(axis='x', colors='#aaaaaa', labelsize=14)
     ax.tick_params(axis='y', colors='#555555')
+
+    # Защита от схлопывания графика, если PnL равен нулю
+    max_val = max([abs(v) for v in values] + [10.0]) # минимум 10 рублей для масштаба
+    ax.set_ylim(-max_val * 1.5, max_val * 1.5)
 
     plt.tight_layout()
     buf = io.BytesIO()
@@ -123,7 +120,7 @@ def main():
         if res == "WIN": all_wins += 1
         elif res == "LOSS": all_losses += 1
 
-        # Дата самой первой сделки (для отсчета дней)
+        # Дата самой первой сделки
         if "entry_time" in t:
             try:
                 dt = datetime.fromisoformat(t["entry_time"])
