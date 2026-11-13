@@ -78,19 +78,6 @@
       "exit_time": "2026-11-13T21:31:23.783194+00:00",
       "figi": "BBG004S68C39"
     },
-    "VKCO_intraday": {
-      "side": "long",
-      "entry": 231.9,
-      "qty": 1,
-      "entry_time": "2026-11-13T10:01:34.010746+00:00",
-      "entry_prob": 0.4862631725971828,
-      "tp": 236.538,
-      "sl": 230.7405,
-      "trailing_stop": 234.5082,
-      "highest": 235.45,
-      "exit_time": "2026-11-13T22:01:34.010746+00:00",
-      "figi": "TCS00A106YF0"
-    },
     "VKCO_swing": {
       "side": "long",
       "entry": 234.1,
@@ -103,19 +90,6 @@
       "highest": 235.45,
       "exit_time": "2026-11-14T11:31:36.418492+00:00",
       "figi": "TCS00A106YF0"
-    },
-    "EUTR_intraday": {
-      "side": "long",
-      "entry": 15.25,
-      "qty": 1,
-      "entry_time": "2026-11-13T12:01:38.177251+00:00",
-      "entry_prob": 0.5026275790490334,
-      "tp": 15.555,
-      "sl": 15.17375,
-      "trailing_stop": 15.17375,
-      "highest": 15.25,
-      "exit_time": "2026-11-14T00:01:38.177251+00:00",
-      "figi": "TCS00A1002V2"
     }
   },
   "last_h1_candle": {
@@ -130,7 +104,9 @@
     "ETLN_intraday": "2026-11-13T09:00:00+00:00",
     "VKCO_swing": "2026-11-13T11:00:00+00:00"
   },
-  "cooldown": {},
+  "cooldown": {
+    "EUTR_intraday": "2026-11-13T12:46:21.406644+00:00"
+  },
   "deposit_v3": true,
   "alert_sent_v3": false
 }
