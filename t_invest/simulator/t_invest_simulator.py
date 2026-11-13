@@ -29,7 +29,8 @@ NEWS_SCORES_FILE = Path("t_invest/data/news/t_invest_news_scores.json")
 
 FEATURE_COLS = ["open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_21", "macd_hist", "ema_20", "ema_50", "ema_200", "vol_sma", "atr_7", "atr_14", "atr_50", "atr_100", "price_change_1h", "price_change_4h", "price_change_24h"]
 
-MIN_PROBABILITY = 0.35
+# ПОДНЯЛИ ПОРОГ ДО 0.45
+MIN_PROBABILITY = 0.45
 NEWS_BLOCK_THRESHOLD = -0.5 
 KLG_TZ = timezone(timedelta(hours=2))
 
@@ -86,7 +87,6 @@ def load_news_scores():
     except Exception as e: return {}
 
 def get_stats_text(ticker, history, now_time):
-    """Считает статистику за сегодня и общий период работы"""
     today_str = now_time.strftime("%Y-%m-%d")
     today_wins = 0
     today_losses = 0
@@ -95,7 +95,6 @@ def get_stats_text(ticker, history, now_time):
     first_trade_dt = None
 
     for record in history:
-        # Ищем самую первую сделку для определения даты старта
         if record.get("type") == "BUY" and "entry_time" in record:
             try:
                 dt = datetime.fromisoformat(record["entry_time"])
@@ -103,26 +102,21 @@ def get_stats_text(ticker, history, now_time):
                     first_trade_dt = dt
             except: pass
 
-        # Считаем статистику по закрытым сделкам
         if record.get("type") == "SELL":
             res = record.get("result")
             t = record.get("ticker")
             exit_time_str = record.get("exit_time", "")
 
-            # По тикеру
             if t == ticker:
                 if res == "WIN": ticker_wins += 1
                 elif res == "LOSS": ticker_losses += 1
 
-            # За сегодня (используем дату выхода)
             if exit_time_str.startswith(today_str):
                 if res == "WIN": today_wins += 1
                 elif res == "LOSS": today_losses += 1
 
-    # Форматируем блок
     total_today = today_wins + today_losses
     winrate = (today_wins / total_today * 100) if total_today > 0 else 0.0
-
     total_ticker = ticker_wins + ticker_losses
 
     first_trade_str = "Неизвестно"
@@ -257,7 +251,8 @@ def main():
                     pos = state["positions"][pos_key]
                     if current_price > pos["highest"]: pos["highest"] = current_price
                     
-                    trail_dist_pct = cfg["params"]["sl_pct"] * 0.5
+                    # РАСШИРИЛИ ТРЕЙЛИНГ-СТОП (было 0.5, стало 0.8)
+                    trail_dist_pct = cfg["params"]["sl_pct"] * 0.8
                     new_trail = pos["highest"] * (1 - trail_dist_pct / 100)
                     if new_trail > pos["trailing_stop"]:
                         pos["trailing_stop"] = new_trail
@@ -307,7 +302,6 @@ def main():
                             log.info(f"AUDIT_TRADE: {json.dumps(trade_record)}")
                             history.append(trade_record)
                             
-                            # Высчитываем статистику ПЕРЕД отправкой (включая только что закрытую сделку)
                             stats_text = get_stats_text(ticker, history, now_time)
 
                             msg_text = (
