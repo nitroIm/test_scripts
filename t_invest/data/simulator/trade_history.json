@@ -433,5 +433,21 @@
     "entry_time": "2026-11-13T08:01:42.727897+00:00",
     "entry_price": 923.4,
     "entry_prob": 0.4976
+  },
+  {
+    "ticker": "VKCO",
+    "mode": "intraday",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-13T08:01:42.727897+00:00",
+    "entry_price": 234.0,
+    "entry_prob": 0.48465614171902377,
+    "exit_time": "2026-11-13T08:31:32.775088+00:00",
+    "exit_price": 232.9,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.5,
+    "pnl_pct": -0.47,
+    "pnl_rub": -1.1,
+    "balance_after": 7881.53
   }
 ]
