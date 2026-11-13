@@ -1,5 +1,5 @@
 # ============================================================
-# T-INVEST - AUDIT RUNNER
+# T-INVEST - AUDIT RUNNER (SMART STARVATION & LOSS LOGIC)
 # Path: t_invest/audit/run_audit.py
 # ============================================================
 
@@ -13,15 +13,12 @@ from datetime import datetime, timezone, timedelta
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("audit")
 
-# Настройки путей
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 HISTORY_FILE = BASE_DIR / "t_invest/data/simulator/trade_history.json"
 CONFIG_FILE = BASE_DIR / "t_invest/data/simulator/simulator_config.json"
 
-# Telegram
 TG_TOKEN = os.environ.get("INVEST_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
-
 KLG_TZ = timezone(timedelta(hours=2))
 
 def send_tg(text):
@@ -45,50 +42,65 @@ def main():
     log.info("STARTING AUDIT")
     
     history = load_json(HISTORY_FILE, [])
+    
+    # Добавляем поле starvation_count в дефолтный конфиг
     config = load_json(CONFIG_FILE, {
-        "intraday": {"min_prob": 0.45, "trail_mult": 0.8, "news_block": -0.5},
-        "swing": {"min_prob": 0.45, "trail_mult": 0.8, "news_block": -0.5}
+        "intraday": {"min_prob": 0.45, "trail_mult": 0.8, "news_block": -0.5, "starvation_count": 0},
+        "swing": {"min_prob": 0.45, "trail_mult": 0.8, "news_block": -0.5, "starvation_count": 0}
     })
+
+    # На случай, если старый конфиг без поля starvation_count
+    for mode in ["intraday", "swing"]:
+        if "starvation_count" not in config[mode]:
+            config[mode]["starvation_count"] = 0
 
     today_str = datetime.now(KLG_TZ).strftime("%Y-%m-%d")
     changes_made = []
     
-    # Анализируем каждый режим отдельно
     for mode in ["intraday", "swing"]:
-        # Берем сделки за сегодня для этого режима
-        today_trades = [t for t in history if t.get("type") == "SELL" and t.get("mode") == mode and t.get("exit_time", "").startswith(today_str)]
+        # Собираем ВСЕ сделки за сегодня (и покупки, и продажи) для этого режима
+        today_trades = [t for t in history if t.get("mode") == mode and t.get("entry_time", "").startswith(today_str)]
         
-        # Считаем убытки подряд (с конца)
+        # Считаем убытки подряд (только закрытые сделки)
+        today_sells = [t for t in today_trades if t.get("type") == "SELL"]
         consecutive_losses = 0
-        for t in reversed(today_trades):
+        for t in reversed(today_sells):
             if t.get("result") == "LOSS":
                 consecutive_losses += 1
             else:
                 break
         
-        log.info(f"{mode.upper()}: Сделок за сегодня: {len(today_trades)}, Убытков подряд: {consecutive_losses}")
+        log.info(f"{mode.upper()}: Сделок за сегодня: {len(today_trades)}, Убытков подряд: {consecutive_losses}, Голодание: {config[mode]['starvation_count']}")
 
-        # === ЛОГИКА ИЗМЕНЕНИЙ ===
-        # 1. Если 3 и более убытка подряд -> Повышаем порог и расширяем трейлинг
+        # === ЛОГИКА 1: СЕРИЯ УБЫТКОВ (Повышаем порог) ===
         if consecutive_losses >= 3:
             old_prob = config[mode]["min_prob"]
             old_trail = config[mode]["trail_mult"]
             
-            # Поднимаем порог (максимум до 0.65)
             config[mode]["min_prob"] = min(0.65, round(old_prob + 0.02, 2))
-            # Расширяем трейлинг (максимум до 1.5)
             config[mode]["trail_mult"] = min(1.5, round(old_trail + 0.2, 1))
+            config[mode]["starvation_count"] = 0 # Сбрасываем голодание
             
             if old_prob != config[mode]["min_prob"] or old_trail != config[mode]["trail_mult"]:
                 changes_made.append(f"{mode.upper()}: {consecutive_losses} LOSS подряд. Порог: {old_prob}->{config[mode]['min_prob']}. Трейлинг: {old_trail}->{config[mode]['trail_mult']}")
 
-        # 2. Если 0 сделок за сегодня (к концу дня) -> Понижаем порог, чтобы заставить торговать
-        # (Это стоит запускать только вечером, но для теста оставим так)
+        # === ЛОГИКА 2: ГОЛОДАНИЕ (Понижаем порог, если 0 сделок) ===
         elif len(today_trades) == 0:
-            old_prob = config[mode]["min_prob"]
-            config[mode]["min_prob"] = max(0.35, round(old_prob - 0.02, 2))
-            if old_prob != config[mode]["min_prob"]:
-                changes_made.append(f"{mode.upper()}: 0 сделок. Порог снижен: {old_prob}->{config[mode]['min_prob']}")
+            config[mode]["starvation_count"] += 1
+            log.info(f"{mode.upper()}: Нет сделок. Счетчик голодания: {config[mode]['starvation_count']}/3")
+            
+            # Если 3 часа подряд нет сделок — снижаем порог
+            if config[mode]["starvation_count"] >= 3:
+                old_prob = config[mode]["min_prob"]
+                config[mode]["min_prob"] = max(0.35, round(old_prob - 0.02, 2))
+                config[mode]["starvation_count"] = 0 # Сбрасываем счетчик после снижения
+                
+                if old_prob != config[mode]["min_prob"]:
+                    changes_made.append(f"{mode.upper()}: 3 часа без сделок (голодание). Порог снижен: {old_prob}->{config[mode]['min_prob']}")
+
+        # Если сделки были, но мало (1-2), просто сбрасываем счетчик голодания
+        else:
+            config[mode]["starvation_count"] = 0
 
     if changes_made:
         save_json(CONFIG_FILE, config)
@@ -98,7 +110,7 @@ def main():
         msg += "\n".join([f"• {c}" for c in changes_made])
         send_tg(msg)
     else:
-        log.info("Изменений не требуется. Винрейт в норме.")
+        log.info("Изменений не требуется. Бот в норме.")
 
 if __name__ == "__main__":
     main()
