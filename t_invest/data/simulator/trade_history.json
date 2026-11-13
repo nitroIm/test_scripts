@@ -617,5 +617,29 @@
     "pnl_pct": 0.93,
     "pnl_rub": 0.5,
     "balance_after": 8719.49
+  },
+  {
+    "ticker": "VKCO",
+    "mode": "swing",
+    "type": "BUY",
+    "entry_time": "2026-11-13T11:31:36.418492+00:00",
+    "entry_price": 234.1,
+    "entry_prob": 0.462
+  },
+  {
+    "ticker": "EUTR",
+    "mode": "intraday",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-13T11:01:31.877491+00:00",
+    "entry_price": 15.35,
+    "entry_prob": 0.5358553864940183,
+    "exit_time": "2026-11-13T11:31:36.418492+00:00",
+    "exit_price": 15.25,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.5,
+    "pnl_pct": -0.65,
+    "pnl_rub": -0.1,
+    "balance_after": 8500.61
   }
 ]
