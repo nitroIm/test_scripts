@@ -77,19 +77,6 @@
       "highest": 14.9,
       "exit_time": "2026-11-14T13:31:25.417912+00:00",
       "figi": "TCS00A1002V2"
-    },
-    "EUTR_intraday": {
-      "side": "long",
-      "entry": 14.8,
-      "qty": 1,
-      "entry_time": "2026-11-13T14:01:37.356580+00:00",
-      "entry_prob": 0.513250788382235,
-      "tp": 15.096000000000002,
-      "sl": 14.726,
-      "trailing_stop": 14.726,
-      "highest": 14.85,
-      "exit_time": "2026-11-14T02:01:37.356580+00:00",
-      "figi": "TCS00A1002V2"
     }
   },
   "last_h1_candle": {
@@ -104,7 +91,9 @@
     "ETLN_intraday": "2026-11-13T09:00:00+00:00",
     "VKCO_swing": "2026-11-13T11:00:00+00:00"
   },
-  "cooldown": {},
+  "cooldown": {
+    "EUTR_intraday": "2026-11-13T15:16:17.405457+00:00"
+  },
   "deposit_v3": true,
   "alert_sent_v3": false
 }
