@@ -1,11 +1,7 @@
 name: T-Invest Morning Report
 
 on:
-  workflow_dispatch: # Для ручного запуска
-  schedule:
-    # Запуск в 08:40 по Калининграду (UTC+2) с понедельника по пятницу.
-    # В GitHub Actions время указывается в UTC, поэтому 08:40 - 2 часа = 06:40 UTC.
-   # - cron: '40 6 * * 1-5'
+  workflow_dispatch: # Только ручной запуск или внешний триггер через cron-job.org
 
 jobs:
   send-morning-report:
