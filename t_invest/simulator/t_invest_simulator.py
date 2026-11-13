@@ -1,5 +1,5 @@
 # ============================================================
-# T-INVEST - SIMULATOR (SANDBOX) WITH CONFIG & STATS
+# T-INVEST - SIMULATOR (SANDBOX) WITH COOLDOWN & SMART TRAILING
 # Path: t_invest/simulator/t_invest_simulator.py
 # ============================================================
 
@@ -32,7 +32,6 @@ FEATURE_COLS = ["open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_2
 
 KLG_TZ = timezone(timedelta(hours=2))
 
-# Дефолтные настройки на случай, если файла нет
 DEFAULT_CONFIG = {
     "intraday": {"min_prob": 0.45, "trail_mult": 0.8, "news_block": -0.5},
     "swing": {"min_prob": 0.45, "trail_mult": 0.8, "news_block": -0.5}
@@ -146,7 +145,7 @@ def get_stats_text(ticker, history, now_time):
     )
 
 def main():
-    log.info("STARTING SIMULATOR (READING CONFIG)")
+    log.info("STARTING SIMULATOR (SMART TRAILING & SHORT COOLDOWN)")
     config = load_config()
 
     if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
@@ -168,7 +167,7 @@ def main():
     if cfg_intraday: tickers.update(params_data.get("long_tickers", []))
     
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    state = {"positions": {}, "last_h1_candle": {}, "deposit_v3": False, "alert_sent_v3": False}
+    state = {"positions": {}, "last_h1_candle": {}, "cooldown": {}, "deposit_v3": False, "alert_sent_v3": False}
     
     if STATE_FILE.exists():
         try:
@@ -179,6 +178,7 @@ def main():
         
     if "positions" not in state: state["positions"] = {}
     if "last_h1_candle" not in state: state["last_h1_candle"] = {}
+    if "cooldown" not in state: state["cooldown"] = {}
         
     history = []
     if HISTORY_FILE.exists():
@@ -257,10 +257,13 @@ def main():
                     pos = state["positions"][pos_key]
                     if current_price > pos["highest"]: pos["highest"] = current_price
                     
-                    trail_dist_pct = cfg["params"]["sl_pct"] * mode_config["trail_mult"]
-                    new_trail = pos["highest"] * (1 - trail_dist_pct / 100)
-                    if new_trail > pos["trailing_stop"]:
-                        pos["trailing_stop"] = new_trail
+                    # УМНЫЙ ТРЕЙЛИНГ: подтягиваем только если в плюсе хотя бы на 1%
+                    profit_pct = (pos["highest"] - pos["entry"]) / pos["entry"] * 100
+                    if profit_pct > 1.0:
+                        trail_dist_pct = cfg["params"]["sl_pct"] * mode_config["trail_mult"]
+                        new_trail = pos["highest"] * (1 - trail_dist_pct / 100)
+                        if new_trail > pos["trailing_stop"]:
+                            pos["trailing_stop"] = new_trail
 
                     exit_reason = None
                     if current_price <= pos["trailing_stop"]: exit_reason = "TRAILING_STOP"
@@ -280,6 +283,13 @@ def main():
                             rub_balance += (current_price * pos["qty"] * lot)
                             
                             result_str = "WIN" if pnl_pct > 0 else "LOSS"
+                            
+                            # КОРОТКАЯ ЗАМОРОЗКА ПРИ УБЫТКЕ
+                            if result_str == "LOSS":
+                                cooldown_hours = 0.5 if mode == "intraday" else 1.0 # 30 минут или 1 час
+                                state["cooldown"][pos_key] = (now_time + timedelta(hours=cooldown_hours)).isoformat()
+                                log.info(f"{pos_key} LOSS. Заморозка на {cooldown_hours} ч.")
+
                             emoji = "✅" if result_str == "WIN" else "❌"
                             title = "СДЕЛКА ЗАКРЫТА В ПЛЮС" if result_str == "WIN" else "СДЕЛКА ЗАКРЫТА В МИНУС"
                             
@@ -296,7 +306,6 @@ def main():
                             history.append(trade_record)
                             
                             stats_text = get_stats_text(ticker, history, now_time)
-
                             msg_text = (
                                 f"{emoji} <b>{title} {ticker} ({mode.upper()})</b>\n"
                                 f"Причина: {exit_reason}\n"
@@ -307,13 +316,20 @@ def main():
                                 f"Время: {current_klg} КЛГ"
                                 f"{stats_text}"
                             )
-                            
                             send_tg(msg_text)
                             del state["positions"][pos_key]
                         except Exception as e: log.error(f"Sell error {pos_key}: {e}")
 
                 # === ВХОД ===
                 if pos_key not in state["positions"]:
+                    # ПРОВЕРКА ЗАМОРОЗКИ
+                    if pos_key in state["cooldown"]:
+                        cooldown_until = datetime.fromisoformat(state["cooldown"][pos_key])
+                        if now_time < cooldown_until:
+                            continue # Пропускаем, еще рано
+                        else:
+                            del state["cooldown"][pos_key] # Остыл, можно торговать
+
                     model = models.get(mode)
                     signal = 0
                     prob = 0.0
@@ -342,13 +358,12 @@ def main():
                             continue
 
                         if news_score < mode_config["news_block"]:
-                            log.info(f"{pos_key} SIGNAL! Но новости плохие ({news_score}). Пропуск.")
                             continue
                         
                         trade_cost = current_price * lot
                         if rub_balance < trade_cost:
                             if rub_balance < 100 and not state.get("alert_sent_v3", False):
-                                send_tg(f"⚠️ <b>ВНИМАНИЕ! ДЕНЬГИ ЗАКОНЧИЛИСЬ</b>\n\nБаланс песочницы упал до {rub_balance:.2f} ₽.")
+                                send_tg(f"⚠️ <b>ВНИМАНИЕ! ДЕНЬГИ ЗАКОНЧИЛИСЬ</b>\n\nБаланс: {rub_balance:.2f} ₽.")
                                 state["alert_sent_v3"] = True
                             continue
                         
