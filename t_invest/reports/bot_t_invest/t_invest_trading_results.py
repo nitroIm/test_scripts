@@ -49,23 +49,23 @@ def send_telegram_photo(photo_buf, caption):
 
 def create_pnl_chart(intraday_pnl, swing_pnl):
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(10, 5), facecolor='#1a1a1a')
+    fig, ax = plt.subplots(figsize=(10, 6), facecolor='#1a1a1a')
     ax.set_facecolor('#1a1a1a')
 
     labels = ['Intraday', 'Swing']
     values = [intraday_pnl, swing_pnl]
     colors = ['#00C853' if v >= 0 else '#D50000' for v in values]
 
-    bars = ax.bar(labels, values, color=colors, width=0.5)
+    bars = ax.bar(labels, values, color=colors, width=0.6)
     
     # Линия нуля
-    ax.axhline(0, color='#555555', linewidth=1, zorder=0)
+    ax.axhline(0, color='#ffffff', linewidth=2, zorder=0)
 
-    # Автоматически подписываем столбики (сверху или снизу)
-    # Это самый надежный способ, он не ломает масштаб оси
-    ax.bar_label(bars, fmt='%+.2f ₽', padding=5, color='white', fontsize=14, fontweight='bold')
+    # Огромные цифры на столбиках
+    ax.bar_label(bars, fmt='%+.2f ₽', padding=10, color='#ffffff', fontsize=20, fontweight='bold')
 
-    ax.set_title("Результат за день по режимам", color='#ffffff', pad=20, fontsize=16, fontweight='bold')
+    # Огромный заголовок
+    ax.set_title("Результат за день по режимам", color='#ffffff', pad=20, fontsize=24, fontweight='bold')
     
     # Убираем рамки
     ax.spines['top'].set_visible(False)
@@ -73,11 +73,14 @@ def create_pnl_chart(intraday_pnl, swing_pnl):
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
     
-    ax.tick_params(axis='x', colors='#aaaaaa', labelsize=14)
-    ax.tick_params(axis='y', colors='#555555')
+    # Огромные названия режимов
+    ax.tick_params(axis='x', colors='#ffffff', labelsize=20)
+    
+    # Убираем цифры по бокам (оси Y), чтобы не сжимали график
+    ax.set_yticks([])
 
-    # Защита от схлопывания графика, если PnL равен нулю
-    max_val = max([abs(v) for v in values] + [10.0]) # минимум 10 рублей для масштаба
+    # Защита от схлопывания графика
+    max_val = max([abs(v) for v in values] + [20.0])
     ax.set_ylim(-max_val * 1.5, max_val * 1.5)
 
     plt.tight_layout()
