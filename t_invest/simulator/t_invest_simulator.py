@@ -1,9 +1,9 @@
 # ============================================================
-# T-INVEST - SIMULATOR (SANDBOX) WITH NEWS FILTER & AUDIT
+# T-INVEST - SIMULATOR (SANDBOX) WITH STATS IN TG
 # Path: t_invest/simulator/t_invest_simulator.py
 # ============================================================
 
-import os, json, logging, joblib, requests
+import os, sys, json, logging, joblib, requests
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -36,7 +36,7 @@ KLG_TZ = timezone(timedelta(hours=2))
 def send_tg(text):
     if not TG_TOKEN or not TG_CHAT_ID: return
     try:
-        requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage", json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=10)
+        requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage", json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True}, timeout=10)
     except: pass
 
 def q2f(q): return q.units + q.nano / 1e9
@@ -85,8 +85,63 @@ def load_news_scores():
             return json.load(f)
     except Exception as e: return {}
 
+def get_stats_text(ticker, history, now_time):
+    """Считает статистику за сегодня и общий период работы"""
+    today_str = now_time.strftime("%Y-%m-%d")
+    today_wins = 0
+    today_losses = 0
+    ticker_wins = 0
+    ticker_losses = 0
+    first_trade_dt = None
+
+    for record in history:
+        # Ищем самую первую сделку для определения даты старта
+        if record.get("type") == "BUY" and "entry_time" in record:
+            try:
+                dt = datetime.fromisoformat(record["entry_time"])
+                if first_trade_dt is None or dt < first_trade_dt:
+                    first_trade_dt = dt
+            except: pass
+
+        # Считаем статистику по закрытым сделкам
+        if record.get("type") == "SELL":
+            res = record.get("result")
+            t = record.get("ticker")
+            exit_time_str = record.get("exit_time", "")
+
+            # По тикеру
+            if t == ticker:
+                if res == "WIN": ticker_wins += 1
+                elif res == "LOSS": ticker_losses += 1
+
+            # За сегодня (используем дату выхода)
+            if exit_time_str.startswith(today_str):
+                if res == "WIN": today_wins += 1
+                elif res == "LOSS": today_losses += 1
+
+    # Форматируем блок
+    total_today = today_wins + today_losses
+    winrate = (today_wins / total_today * 100) if total_today > 0 else 0.0
+
+    total_ticker = ticker_wins + ticker_losses
+
+    first_trade_str = "Неизвестно"
+    if first_trade_dt:
+        days_active = (now_time - first_trade_dt).days + 1
+        first_trade_str = f"{first_trade_dt.astimezone(KLG_TZ).strftime('%d.%m.%Y')} ({days_active} дн.)"
+
+    text = (
+        f"\n\n📊 <b>Статистика за сегодня ({today_str}):</b>\n"
+        f"Всего: {total_today} (WIN: {today_wins}, LOSS: {today_losses})\n"
+        f"Винрейт: {winrate:.1f}%\n\n"
+        f"🎯 <b>По тикеру {ticker}:</b>\n"
+        f"Всего: {total_ticker} (WIN: {ticker_wins}, LOSS: {ticker_losses})\n\n"
+        f"📅 <b>Симулятор в работе с:</b> {first_trade_str}"
+    )
+    return text
+
 def main():
-    log.info("STARTING SIMULATOR (WITH NEWS FILTER & AUDIT)")
+    log.info("STARTING SIMULATOR (WITH STATS)")
     if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
         log.error("best_params.json or whitelist.json not found"); return
 
@@ -126,7 +181,6 @@ def main():
     
     news_scores = load_news_scores()
     now_time = datetime.now(timezone.utc)
-    
     current_klg = now_time.astimezone(KLG_TZ).strftime("%d.%m.%Y %H:%M")
 
     models = {}
@@ -217,7 +271,6 @@ def main():
                         try:
                             client.sandbox.post_sandbox_order(figi=figi, quantity=pos["qty"], direction=OrderDirection.ORDER_DIRECTION_SELL, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
                             
-                            # Защита от старых позиций без entry_time
                             entry_time_str = pos.get("entry_time", now_time.isoformat())
                             entry_time = datetime.fromisoformat(entry_time_str)
                             duration_hours = round((now_time - entry_time).total_seconds() / 3600, 2)
@@ -226,7 +279,6 @@ def main():
                             pnl_rub = (current_price - pos["entry"]) * pos["qty"] * lot
                             rub_balance += (current_price * pos["qty"] * lot)
                             
-                            # Определение результата
                             result_str = "WIN" if pnl_pct > 0 else "LOSS"
                             if result_str == "WIN":
                                 emoji = "✅"
@@ -255,7 +307,10 @@ def main():
                             log.info(f"AUDIT_TRADE: {json.dumps(trade_record)}")
                             history.append(trade_record)
                             
-                            send_tg(
+                            # Высчитываем статистику ПЕРЕД отправкой (включая только что закрытую сделку)
+                            stats_text = get_stats_text(ticker, history, now_time)
+
+                            msg_text = (
                                 f"{emoji} <b>{title} {ticker} ({mode.upper()})</b>\n"
                                 f"Причина: {exit_reason}\n"
                                 f"Вход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\n"
@@ -263,7 +318,10 @@ def main():
                                 f"PnL: {pnl_pct:+.2f}% ({pnl_rub:+.2f}₽)\n"
                                 f"Баланс: {rub_balance:.2f}₽\n"
                                 f"Время: {current_klg} КЛГ"
+                                f"{stats_text}"
                             )
+                            
+                            send_tg(msg_text)
                             del state["positions"][pos_key]
                         except Exception as e: log.error(f"Sell error {pos_key}: {e}")
 
