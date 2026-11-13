@@ -49,19 +49,6 @@
       "highest": 927.0,
       "exit_time": "2026-11-14T07:46:04.128216+00:00",
       "figi": "BBG004S68C39"
-    },
-    "LSRG_intraday": {
-      "side": "long",
-      "entry": 923.4,
-      "qty": 1,
-      "entry_time": "2026-11-13T08:01:42.727897+00:00",
-      "entry_prob": 0.49763727920828826,
-      "tp": 941.8679999999999,
-      "sl": 918.783,
-      "trailing_stop": 923.292,
-      "highest": 927.0,
-      "exit_time": "2026-11-13T20:01:42.727897+00:00",
-      "figi": "BBG004S68C39"
     }
   },
   "last_h1_candle": {
@@ -75,6 +62,9 @@
     "EUTR_swing": "2026-11-13T07:00:00+00:00",
     "ETLN_intraday": "2026-11-13T07:00:00+00:00",
     "VKCO_swing": "2026-11-13T07:00:00+00:00"
+  },
+  "cooldown": {
+    "LSRG_intraday": "2026-11-13T09:29:37.108340+00:00"
   },
   "deposit_v3": true,
   "alert_sent_v3": false
