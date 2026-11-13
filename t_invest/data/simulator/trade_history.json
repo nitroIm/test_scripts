@@ -465,5 +465,21 @@
     "pnl_pct": -0.45,
     "pnl_rub": -4.2,
     "balance_after": 9698.73
+  },
+  {
+    "ticker": "VKCO",
+    "mode": "intraday",
+    "type": "BUY",
+    "entry_time": "2026-11-13T09:01:36.058385+00:00",
+    "entry_price": 233.15,
+    "entry_prob": 0.4852
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "type": "BUY",
+    "entry_time": "2026-11-13T09:01:36.058385+00:00",
+    "entry_price": 24.5,
+    "entry_prob": 0.4799
   }
 ]
