@@ -65,19 +65,6 @@
       "exit_time": "2026-11-14T11:31:36.418492+00:00",
       "figi": "TCS00A106YF0"
     },
-    "EUTR_intraday": {
-      "side": "long",
-      "entry": 14.7,
-      "qty": 1,
-      "entry_time": "2026-11-13T13:01:43.086877+00:00",
-      "entry_prob": 0.5328536451898865,
-      "tp": 14.994,
-      "sl": 14.6265,
-      "trailing_stop": 14.8404,
-      "highest": 14.9,
-      "exit_time": "2026-11-14T01:01:43.086877+00:00",
-      "figi": "TCS00A1002V2"
-    },
     "EUTR_swing": {
       "side": "long",
       "entry": 14.8,
@@ -90,6 +77,19 @@
       "highest": 14.9,
       "exit_time": "2026-11-14T13:31:25.417912+00:00",
       "figi": "TCS00A1002V2"
+    },
+    "EUTR_intraday": {
+      "side": "long",
+      "entry": 14.8,
+      "qty": 1,
+      "entry_time": "2026-11-13T14:01:37.356580+00:00",
+      "entry_prob": 0.513250788382235,
+      "tp": 15.096000000000002,
+      "sl": 14.726,
+      "trailing_stop": 14.726,
+      "highest": 14.8,
+      "exit_time": "2026-11-14T02:01:37.356580+00:00",
+      "figi": "TCS00A1002V2"
     }
   },
   "last_h1_candle": {
@@ -97,16 +97,14 @@
     "VKCO_intraday": "2026-11-13T10:00:00+00:00",
     "MVID_intraday": "2026-11-13T09:00:00+00:00",
     "MVID_swing": "2026-11-13T09:00:00+00:00",
-    "EUTR_intraday": "2026-11-13T13:00:00+00:00",
+    "EUTR_intraday": "2026-11-13T14:00:00+00:00",
     "LSRG_intraday": "2026-11-13T09:00:00+00:00",
     "LSRG_swing": "2026-11-13T07:00:00+00:00",
     "EUTR_swing": "2026-11-13T13:00:00+00:00",
     "ETLN_intraday": "2026-11-13T09:00:00+00:00",
     "VKCO_swing": "2026-11-13T11:00:00+00:00"
   },
-  "cooldown": {
-    "ETLN_intraday": "2026-11-13T14:01:25.417912+00:00"
-  },
+  "cooldown": {},
   "deposit_v3": true,
   "alert_sent_v3": false
 }
