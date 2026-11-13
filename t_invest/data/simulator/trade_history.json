@@ -377,5 +377,45 @@
     "pnl_pct": -2.24,
     "pnl_rub": -0.35,
     "balance_after": 7887.39
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-13T07:01:35.046200+00:00",
+    "entry_price": 922.4,
+    "entry_prob": 0.5023001869561938,
+    "exit_time": "2026-11-13T07:46:04.128216+00:00",
+    "exit_price": 921.8,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.74,
+    "pnl_pct": -0.07,
+    "pnl_rub": -0.6,
+    "balance_after": 8808.79
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "swing",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-13T07:46:04.128216+00:00",
+    "entry_price": 920.4,
+    "entry_prob": 0.0,
+    "exit_time": "2026-11-13T07:46:04.128216+00:00",
+    "exit_price": 921.8,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.0,
+    "pnl_pct": 0.15,
+    "pnl_rub": 1.4,
+    "balance_after": 9730.59
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "swing",
+    "type": "BUY",
+    "entry_time": "2026-11-13T07:46:04.128216+00:00",
+    "entry_price": 921.8,
+    "entry_prob": 0.496
   }
 ]
