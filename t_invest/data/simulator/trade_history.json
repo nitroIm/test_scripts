@@ -641,5 +641,13 @@
     "pnl_pct": -0.65,
     "pnl_rub": -0.1,
     "balance_after": 8500.61
+  },
+  {
+    "ticker": "EUTR",
+    "mode": "intraday",
+    "type": "BUY",
+    "entry_time": "2026-11-13T12:01:38.177251+00:00",
+    "entry_price": 15.25,
+    "entry_prob": 0.5026
   }
 ]
