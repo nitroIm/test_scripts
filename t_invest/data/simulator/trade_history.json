@@ -601,5 +601,21 @@
     "entry_time": "2026-11-13T11:01:31.877491+00:00",
     "entry_price": 15.35,
     "entry_prob": 0.5359
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-13T09:31:23.783194+00:00",
+    "entry_price": 53.75,
+    "entry_prob": 0.46133070618374505,
+    "exit_time": "2026-11-13T11:16:13.492665+00:00",
+    "exit_price": 54.25,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 1.75,
+    "pnl_pct": 0.93,
+    "pnl_rub": 0.5,
+    "balance_after": 8719.49
   }
 ]
