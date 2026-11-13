@@ -39,19 +39,6 @@
       "exit_time": "2026-11-14T09:31:23.783194+00:00",
       "figi": "BBG004S68CP5"
     },
-    "LSRG_intraday": {
-      "side": "long",
-      "entry": 918.4,
-      "qty": 1,
-      "entry_time": "2026-11-13T09:31:23.783194+00:00",
-      "entry_prob": 0.5360733986815476,
-      "tp": 936.768,
-      "sl": 913.808,
-      "trailing_stop": 925.0848,
-      "highest": 928.8,
-      "exit_time": "2026-11-13T21:31:23.783194+00:00",
-      "figi": "BBG004S68C39"
-    },
     "VKCO_swing": {
       "side": "long",
       "entry": 234.1,
