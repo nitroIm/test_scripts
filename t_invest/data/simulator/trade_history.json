@@ -801,5 +801,29 @@
     "entry_time": "2026-11-13T15:16:21.623042+00:00",
     "entry_price": 14.6,
     "entry_prob": 0.5171
+  },
+  {
+    "ticker": "EUTR",
+    "mode": "intraday",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-13T15:16:21.623042+00:00",
+    "entry_price": 14.6,
+    "entry_prob": 0.5171293967191194,
+    "exit_time": "2026-11-13T15:46:14.209582+00:00",
+    "exit_price": 14.4,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.5,
+    "pnl_pct": -1.37,
+    "pnl_rub": -0.2,
+    "balance_after": 8758.16
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "type": "BUY",
+    "entry_time": "2026-11-13T15:46:14.209582+00:00",
+    "entry_price": 24.28,
+    "entry_prob": 0.4512
   }
 ]
