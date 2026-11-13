@@ -39,19 +39,6 @@
       "exit_time": "2026-11-13T21:01:36.058385+00:00",
       "figi": "TCS50A10C1L6"
     },
-    "EUTR_swing": {
-      "side": "long",
-      "entry": 15.5,
-      "qty": 1,
-      "entry_time": "2026-11-13T09:16:09.762963+00:00",
-      "entry_prob": 0.45196949345921406,
-      "tp": 16.740000000000002,
-      "sl": 15.035,
-      "trailing_stop": 15.035,
-      "highest": 15.5,
-      "exit_time": "2026-11-14T09:16:09.762963+00:00",
-      "figi": "TCS00A1002V2"
-    },
     "MVID_swing": {
       "side": "long",
       "entry": 53.75,
@@ -105,7 +92,8 @@
     "VKCO_swing": "2026-11-13T11:00:00+00:00"
   },
   "cooldown": {
-    "EUTR_intraday": "2026-11-13T12:46:21.406644+00:00"
+    "EUTR_intraday": "2026-11-13T12:46:21.406644+00:00",
+    "EUTR_swing": "2026-11-13T13:31:20.291360+00:00"
   },
   "deposit_v3": true,
   "alert_sent_v3": false
