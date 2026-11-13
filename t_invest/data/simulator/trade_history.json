@@ -497,5 +497,77 @@
     "entry_time": "2026-11-13T09:16:09.762963+00:00",
     "entry_price": 15.5,
     "entry_prob": 0.452
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "type": "BUY",
+    "entry_time": "2026-11-13T09:31:23.783194+00:00",
+    "entry_price": 53.75,
+    "entry_prob": 0.4613
+  },
+  {
+    "ticker": "MVID",
+    "mode": "swing",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-13T09:31:23.783194+00:00",
+    "entry_price": 52.8,
+    "entry_prob": 0.0,
+    "exit_time": "2026-11-13T09:31:23.783194+00:00",
+    "exit_price": 53.75,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.0,
+    "pnl_pct": 1.8,
+    "pnl_rub": 0.95,
+    "balance_after": 9409.39
+  },
+  {
+    "ticker": "MVID",
+    "mode": "swing",
+    "type": "BUY",
+    "entry_time": "2026-11-13T09:31:23.783194+00:00",
+    "entry_price": 53.75,
+    "entry_prob": 0.4613
+  },
+  {
+    "ticker": "VKCO",
+    "mode": "intraday",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-13T09:01:36.058385+00:00",
+    "entry_price": 233.15,
+    "entry_prob": 0.4851890518257143,
+    "exit_time": "2026-11-13T09:31:23.783194+00:00",
+    "exit_price": 231.1,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.5,
+    "pnl_pct": -0.88,
+    "pnl_rub": -2.05,
+    "balance_after": 9586.74
+  },
+  {
+    "ticker": "VKCO",
+    "mode": "swing",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-13T07:01:35.046200+00:00",
+    "entry_price": 235.15,
+    "entry_prob": 0.4748267454171128,
+    "exit_time": "2026-11-13T09:31:23.783194+00:00",
+    "exit_price": 231.1,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 2.5,
+    "pnl_pct": -1.72,
+    "pnl_rub": -4.05,
+    "balance_after": 9817.84
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "type": "BUY",
+    "entry_time": "2026-11-13T09:31:23.783194+00:00",
+    "entry_price": 918.4,
+    "entry_prob": 0.5361
   }
 ]
