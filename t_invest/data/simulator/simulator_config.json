@@ -1,0 +1,12 @@
+{
+  "intraday": {
+    "min_prob": 0.45,
+    "trail_mult": 0.8,
+    "news_block": -0.5
+  },
+  "swing": {
+    "min_prob": 0.45,
+    "trail_mult": 0.8,
+    "news_block": -0.5
+  }
+}
