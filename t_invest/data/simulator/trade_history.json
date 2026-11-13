@@ -593,5 +593,13 @@
     "entry_time": "2026-11-13T10:01:34.010746+00:00",
     "entry_price": 231.9,
     "entry_prob": 0.4863
+  },
+  {
+    "ticker": "EUTR",
+    "mode": "intraday",
+    "type": "BUY",
+    "entry_time": "2026-11-13T11:01:31.877491+00:00",
+    "entry_price": 15.35,
+    "entry_prob": 0.5359
   }
 ]
