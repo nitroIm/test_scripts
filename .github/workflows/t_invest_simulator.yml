@@ -1,46 +1,49 @@
-name: T-Invest Simulator
+name: T-invest Simulate
 
 on:
-  workflow_dispatch:
-  repository_dispatch:
-    types: [run_simulator]
+  workflow_dispatch: # Для ручного запуска
 
-permissions:
-  contents: write
+concurrency:
+  group: simulator-run
+  cancel-in-progress: false
 
 jobs:
   simulate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Важно для пуша изменений
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: Install dependencies
-        env:
-          SSL_TBANK_VERIFY: 'True'
         run: |
           python -m pip install --upgrade pip
           pip install t-tech-investments==1.49.3 --index-url https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple --trusted-host opensource.tbank.ru
           pip install pandas==2.2.3 numpy==1.26.4 scikit-learn==1.6.1 joblib==1.4.2 requests==2.32.3
           pip install xgboost==2.1.4 lightgbm==4.5.0 catboost==1.2.7
 
-      - name: Run simulator
+      - name: Run Simulator
         env:
           T_INVEST_TOKEN: ${{ secrets.T_INVEST_TOKEN }}
           INVEST_BOT_TOKEN: ${{ secrets.INVEST_BOT_TOKEN }}
           INVEST_BOT_CHAT_ID: ${{ secrets.INVEST_BOT_CHAT_ID }}
-          SSL_TBANK_VERIFY: 'True'
-        run: python t_invest/simulator/t_invest_simulator.py
+          SSL_TBANK_VERIFY: True
+        run: |
+          python t_invest/simulator/t_invest_simulator.py
 
-      - name: Commit state and history
-        if: success()
+      - name: Commit and Push State
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add t_invest/data/simulator/
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update simulator state $(date -u +'%Y-%m-%d %H:%M')" && git pull --rebase origin main && git push)
+          # Проверяем, есть ли изменения, и если есть - коммитим
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update simulator state $(date -u +'%Y-%m-%d %H:%M')")
+          # Подтягиваем изменения (если кто-то успел запушить) и пушим
+          git pull --rebase origin main
+          git push
