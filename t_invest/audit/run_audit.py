@@ -1,6 +1,13 @@
 # ============================================================
 # T-INVEST - AUDIT RUNNER (FINAL LOGIC)
 # Path: t_invest/audit/run_audit.py
+#
+# ИЗМЕНЕНИЯ:
+#   - ФИКС: алерты "LOSS подряд" больше не дублируются на каждом
+#     запуске — срабатывает только при НОВОМ лоссе в серии
+#     (метка last_loss_alert хранится в конфиге).
+#   - То же для логики "мясорубки" (метка last_crush_alert).
+#   - Конфиг сохраняется и когда менялись только метки алертов.
 # ============================================================
 
 import os
@@ -57,6 +64,7 @@ def main():
 
     today_str = datetime.now(KLG_TZ).strftime("%Y-%m-%d")
     changes_made = []
+    config_changed = False
     
     for mode in ["intraday", "swing"]:
         # Берем закрытые сделки за сегодня
@@ -79,23 +87,39 @@ def main():
         daily_trades_count = state.get("daily_trades", {}).get(mode, 0)
         limit_reached = daily_trades_count >= max_trades
 
+        # Сброс метки серии убытков: серия закончилась (вин или новый день) — алерт снова готов
+        if consecutive_losses == 0 and config[mode].get("last_loss_alert", 0):
+            config[mode]["last_loss_alert"] = 0
+            config_changed = True
+
+        # Сброс метки "мясорубки": условие больше не выполняется
+        if total_trades < 5 and config[mode].get("last_crush_alert", 0):
+            config[mode]["last_crush_alert"] = 0
+            config_changed = True
+
         log.info(f"{mode.upper()}: Сделок: {total_trades}, Винрейт: {winrate:.1f}%, Убытков подряд: {consecutive_losses}, Голодание: {config[mode]['starvation_count']}, Лимит: {limit_reached}")
 
         # ЛОГИКА 1: Мясорубка (много сделок, плохой винрейт)
         if total_trades >= 5 and winrate < 40.0:
-            old_prob = config[mode]["min_prob"]
-            config[mode]["min_prob"] = min(0.75, round(old_prob + 0.02, 2))
-            config[mode]["trail_mult"] = min(1.5, round(config[mode]["trail_mult"] + 0.2, 1))
             config[mode]["starvation_count"] = 0
-            if old_prob != config[mode]["min_prob"]:
-                changes_made.append(f"{mode.upper()}: Винрейт {winrate:.1f}% на {total_trades} сделках. Порог: {old_prob}->{config[mode]['min_prob']}.")
+            # ФИКС: срабатывает только если сделок стало больше, чем на прошлом алерте
+            if total_trades > config[mode].get("last_crush_alert", 0):
+                old_prob = config[mode]["min_prob"]
+                config[mode]["min_prob"] = min(0.75, round(old_prob + 0.02, 2))
+                config[mode]["trail_mult"] = min(1.5, round(config[mode]["trail_mult"] + 0.2, 1))
+                config[mode]["last_crush_alert"] = total_trades
+                config_changed = True
+                if old_prob != config[mode]["min_prob"]:
+                    changes_made.append(f"{mode.upper()}: Винрейт {winrate:.1f}% на {total_trades} сделках. Порог: {old_prob}->{config[mode]['min_prob']}.")
         
         # ЛОГИКА 2: Серия убытков
-        elif consecutive_losses >= 3:
+        elif consecutive_losses >= 3 and consecutive_losses > config[mode].get("last_loss_alert", 0):
             old_prob = config[mode]["min_prob"]
             config[mode]["min_prob"] = min(0.75, round(old_prob + 0.02, 2))
             config[mode]["trail_mult"] = min(1.5, round(config[mode]["trail_mult"] + 0.2, 1))
             config[mode]["starvation_count"] = 0
+            config[mode]["last_loss_alert"] = consecutive_losses
+            config_changed = True
             if old_prob != config[mode]["min_prob"]:
                 changes_made.append(f"{mode.upper()}: {consecutive_losses} LOSS подряд. Порог: {old_prob}->{config[mode]['min_prob']}.")
 
@@ -115,11 +139,15 @@ def main():
         else:
             config[mode]["starvation_count"] = 0
 
-    if changes_made:
+    # Сохраняем конфиг при любом изменении (включая сброс меток алертов)
+    if changes_made or config_changed:
         save_json(CONFIG_FILE, config)
-        msg = "🚨 <b>АУДИТ ВНЕС ИЗМЕНЕНИЯ</b>\n\n" + "\n".join([f"• {c}" for c in changes_made])
-        send_tg(msg)
-        log.info("Config updated.")
+        if changes_made:
+            msg = "🚨 <b>АУДИТ ВНЕС ИЗМЕНЕНИЯ</b>\n\n" + "\n".join([f"• {c}" for c in changes_made])
+            send_tg(msg)
+            log.info("Config updated.")
+        else:
+            log.info("Config saved (метки алертов обновлены).")
     else:
         log.info("Изменений не требуется. Бот в норме.")
 
