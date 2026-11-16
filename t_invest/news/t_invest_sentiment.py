@@ -1,6 +1,7 @@
 # ============================================================
-# T-INVEST SENTIMENT ENGINE (с фильтром макро и учётом источника)
+# T-INVEST SENTIMENT ENGINE (с фильтром макро, учетом источника и негативной доминацией)
 # Path: t_invest/news/t_invest_sentiment.py
+# Version: 2.0
 # ============================================================
 
 import json, logging, re
@@ -47,17 +48,25 @@ def get_source_weight(source):
     return SOURCE_WEIGHTS.get(source, 1.0)
 
 def analyze_text(text, dictionary):
+    """
+    Анализирует текст. Разделяет позитив и негатив.
+    Если есть сильный негатив (вес <= -1.5), позитив жестко гасится.
+    """
     if not text:
         return 0.0
 
     text_lower = text.lower()
-    total_score = 0.0
     words = dictionary.get("words", {})
     boosters = dictionary.get("boosters", {})
     dampeners = dictionary.get("dampeners", {})
 
-    tokens = re.findall(r'\b\w+\b', text_lower)
+    # Ищем все слова (учитывая кириллицу)
+    tokens = re.findall(r'\b[а-яёa-z]+\b', text_lower)
     
+    pos_sum = 0.0
+    neg_sum = 0.0
+    has_strong_negative = False
+
     for i, token in enumerate(tokens):
         weight = words.get(token, 0.0)
         if weight == 0:
@@ -71,9 +80,24 @@ def analyze_text(text, dictionary):
             elif prev in dampeners:
                 modifier = dampeners[prev]
         
-        total_score += weight * modifier
+        weighted_score = weight * modifier
+        
+        if weighted_score > 0:
+            pos_sum += weighted_score
+        elif weighted_score < 0:
+            neg_sum += weighted_score
+            # Если нашли слово с весом -1.5 или ниже (дефолт, авария, кибератака)
+            if weight <= -1.5:
+                has_strong_negative = True
 
-    return total_score
+    # --- ПРАВИЛО НЕГАТИВНОЙ ДОМИНАЦИИ ---
+    # Если есть сильный негатив (например, "кибератака"), мы оставляем 
+    # только 10% от позитива, чтобы негативный контекст победил.
+    if has_strong_negative:
+        return neg_sum + (pos_sum * 0.1)
+    
+    # В обычных случаях просто складываем
+    return pos_sum + neg_sum
 
 def main():
     log.info("STARTING SENTIMENT ENGINE")
