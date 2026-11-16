@@ -11,7 +11,7 @@ from t_tech.invest.constants import INVEST_GRPC_API
 from t_tech.invest.schemas import CandleInterval
 from t_tech.invest.utils import now
 
-VERSION = "7.0-long-only-report-sep"
+VERSION = "7.1-180-days"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("t_invest.trainer")
 
@@ -21,7 +21,8 @@ MODEL_OUT_FILE = Path("t_invest/data/model/best_params.json")
 MODELS_SRC_DIR = Path("t_invest/learn/models")
 
 TOP_N_STOCKS = 5        
-HISTORY_DAYS = 90       
+# ИЗМЕНЕНО: Обучаемся на 180 днях (полгода) вместо 90
+HISTORY_DAYS = 180       
 
 MODEL_OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
