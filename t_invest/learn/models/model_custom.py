@@ -1,6 +1,6 @@
 # ============================================================
 # T-INVEST - CUSTOM ONLINE MODEL (RIVER)
-# Version: 1.0
+# Version: 2.0
 # Path: t_invest/learn/models/model_custom.py
 # ============================================================
 
@@ -10,7 +10,6 @@ import pickle
 import os
 from river import linear_model, preprocessing, metrics
 
-# Список фичей (должен совпадать с симулятором)
 FEATURE_COLS = [
     "open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_21",
     "macd_hist", "ema_20", "ema_50", "ema_200", "vol_sma",
@@ -19,38 +18,29 @@ FEATURE_COLS = [
 ]
 
 def train(df, side="long", mode="intraday"):
-    """
-    Обучает онлайн-модель на исторических данных.
-    Возвращает словарь с метриками и путем к сохраненному .pkl
-    """
-    # 1. Проверка на достаточность данных
     if df.empty or len(df) < 100:
         return None
 
     df = df.copy()
     
-    # 2. Создание таргета (целевой переменной)
-    # Смотрим на следующую свечу: если для лонга она выше, это WIN (1), иначе LOSS (0)
-    future_close = df['close'].shift(-1)
+    # ИСПРАВЛЕНИЕ: Горизонт предсказания зависит от режима
+    horizon = 4 if mode == "intraday" else 24
+    future_close = df.groupby('ticker')['close'].shift(-horizon)
+    
     if side == "long":
         df['target'] = (future_close > df['close']).astype(int)
     else:
         df['target'] = (future_close < df['close']).astype(int)
 
-    # Убираем последнюю строку, где target = NaN
     df = df.dropna(subset=['target'])
 
-    # 3. Инициализация онлайн-модели
-    # StandardScaler нормализует данные, LogisticRegression делает предсказание
     model = preprocessing.StandardScaler() | linear_model.LogisticRegression()
 
-    # 4. Обучение (по одному наблюдению)
     for _, row in df.iterrows():
         x = row[FEATURE_COLS].to_dict()
         y = row['target']
         model.learn_one(x, y)
 
-    # 5. Оценка на последних 20% данных (для отчета)
     test_size = int(len(df) * 0.2)
     test_df = df.iloc[-test_size:]
     y_true = []
@@ -62,17 +52,14 @@ def train(df, side="long", mode="intraday"):
         y_true.append(row['target'])
         y_pred.append(1 if prob >= 0.5 else 0)
 
-    # Считаем Accuracy (процент угаданных)
     accuracy = metrics.Accuracy().update(y_true, y_pred).get()
-    score = accuracy * 100  # Используем как Score
+    score = accuracy * 100
 
-    # 6. Сохранение модели в файл
     model_path = f"t_invest/data/model/custom_{side}_{mode}.pkl"
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     with open(model_path, "wb") as f:
         pickle.dump(model, f)
 
-    # 7. Возврат результата для тренера
     return {
         "source": "model_custom_online",
         "metrics": {"score": round(score, 4)},
