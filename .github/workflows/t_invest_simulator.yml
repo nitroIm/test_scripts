@@ -1,4 +1,4 @@
-name: Simulate
+name: T-INVEST Simulate
 
 on:
   workflow_dispatch:
