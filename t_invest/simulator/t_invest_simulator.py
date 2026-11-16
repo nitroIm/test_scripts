@@ -1,17 +1,13 @@
 # ============================================================
-# T-INVEST - SIMULATOR (LONG/SHORT & ONLINE UPDATE & SWING MULTI-DAY)
-# Version: 8.1 (FIX 1)
+# T-INVEST - SIMULATOR (LONG/SHORT & ONLINE UPDATE & NO LIMITS)
+# Version: 8.2
 # Path: t_invest/simulator/t_invest_simulator.py
 #
 # ИЗМЕНЕНИЯ:
-#   - ФИКС фантомных закрытий: удаление позиции из стейта теперь
-#     происходит СРАЗУ после успешного ордера, а не в конце блока
-#     расчётов. Ошибка в учёте/TG больше не resurrect-ит позицию.
-#   - Если ордер закрытия не прошёл — позиция остаётся открытой
-#     (continue), попытка повторится на следующем прогоне.
-#   - ЛОГИ ВХОДА: каждый блокированный вход теперь виден в логах
-#     с причиной (лимит, кулдаун, баланс, новости, нет модели,
-#     дубликат свечи). Больше никаких немых continue.
+#   - УДАЛЕНЫ дневные лимиты на сделки (MAX_INTRADAY_TRADES и т.д.).
+#     Теперь частоту торговли регулирует исключительно Аудит 
+#     через порог вероятности (min_prob).
+#   - Сохранены фиксы фантомных закрытий и детальные логи входов.
 # ============================================================
 
 import os, sys, json, logging, joblib, requests, pickle
@@ -41,8 +37,6 @@ CONFIG_FILE = Path("t_invest/data/simulator/simulator_config.json")
 
 FEATURE_COLS = ["open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_21", "macd_hist", "ema_20", "ema_50", "ema_200", "vol_sma", "atr_7", "atr_14", "atr_50", "atr_100", "price_change_1h", "price_change_4h", "price_change_24h"]
 
-MAX_INTRADAY_TRADES = 3
-MAX_SWING_TRADES = 2
 KLG_TZ = timezone(timedelta(hours=2))
 
 DEFAULT_CONFIG = {
@@ -146,7 +140,7 @@ def get_stats_text(ticker, history, now_time):
 
 # --- ОСНОВНОЙ ЦИКЛ ---
 def main():
-    log.info("STARTING SIMULATOR v8.1 FIX1 (LONG/SHORT & SWING MULTI-DAY)")
+    log.info("STARTING SIMULATOR v8.2 (NO LIMITS, LONG/SHORT, ONLINE UPDATE)")
     config = load_config()
 
     if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
@@ -158,13 +152,11 @@ def main():
     wl_stocks = wl_data["data"] if isinstance(wl_data, dict) and "data" in wl_data else wl_data
     figi_map = {s["ticker"]: s["figi"] for s in wl_stocks}
 
-    # Собираем все тикеры (и для лонга, и для шорта)
     tickers = set(params_data.get("long_tickers", []))
     tickers.update(params_data.get("short_tickers", []))
 
-    # Загрузка состояния
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    state = {"positions": {}, "last_h1_candle": {}, "cooldown": {}, "deposit_v3": False, "alert_sent_v3": False, "daily_trades": {}}
+    state = {"positions": {}, "last_h1_candle": {}, "cooldown": {}, "deposit_v3": False, "alert_sent_v3": False}
     if STATE_FILE.exists():
         try:
             with open(STATE_FILE) as f: loaded_state = json.load(f)
@@ -175,7 +167,6 @@ def main():
     if "last_h1_candle" not in state: state["last_h1_candle"] = {}
     if "cooldown" not in state: state["cooldown"] = {}
 
-    # ДИАГНОСТИКА: сразу видно, что живёт в стейте на момент старта
     if state["positions"]:
         log.info(f"Открытые позиции в стейте: {', '.join(state['positions'].keys())}")
     else:
@@ -192,15 +183,9 @@ def main():
     current_klg = now_time.astimezone(KLG_TZ).strftime("%d.%m.%Y %H:%M")
     today_str = now_time.astimezone(KLG_TZ).strftime("%Y-%m-%d")
 
-    # Проверка: можем ли мы открывать НОВЫЕ сделки (с 9 до 18 по КЛГ)
     now_klg = now_time.astimezone(KLG_TZ)
     is_trading_hours = (9 <= now_klg.hour < 18)
 
-    # Сброс дневных лимитов
-    if state["daily_trades"].get("date") != today_str:
-        state["daily_trades"] = {"date": today_str, "intraday": 0, "swing": 0}
-
-    # Загрузка моделей (ML и онлайн)
     models = {}
     for mode in ["intraday", "swing"]:
         for side in ["long", "short"]:
@@ -230,7 +215,6 @@ def main():
             for m in positions.money:
                 if m.currency == "rub": rub_balance = q2f(m); break
 
-            # Первоначальное пополнение
             if not state.get("deposit_v3", False):
                 if rub_balance < 10:
                     client.sandbox.sandbox_pay_in(account_id=acc_id, amount=MoneyValue(currency="rub", units=10000, nano=0))
@@ -241,7 +225,6 @@ def main():
 
         log.info(f"Баланс песочницы: {rub_balance:.2f}₽, торговое время: {is_trading_hours}")
 
-        # --- ЦИКЛ ПО ТИКЕРАМ ---
         for ticker in tickers:
             figi = figi_map.get(ticker)
             if not figi: continue
@@ -259,7 +242,6 @@ def main():
             last_candle = df_h1.iloc[-1]
             lot = next((s['lot'] for s in wl_stocks if s['ticker'] == ticker), 1)
 
-            # --- ЦИКЛ ПО РЕЖИМАМ И СТОРОНАМ ---
             for mode in ["intraday", "swing"]:
                 for side in ["long", "short"]:
                     cfg = params_data.get(mode, {}).get(side)
@@ -268,18 +250,16 @@ def main():
                     pos_key = f"{ticker}_{mode}_{side}"
                     mode_config = config.get(mode, DEFAULT_CONFIG[mode])
 
-                    # === ЛОГИКА ВЫХОДА (Работает 24/7 для Swing) ===
+                    # === ЛОГИКА ВЫХОДА ===
                     if pos_key in state["positions"]:
                         pos = state["positions"][pos_key]
                         is_long = (pos["side"] == "long")
 
-                        # Обновление экстремума
                         if is_long:
                             if current_price > pos["highest"]: pos["highest"] = current_price
                         else:
                             if current_price < pos.get("lowest", 999999): pos["lowest"] = current_price
 
-                        # Трейлинг-стоп
                         profit_pct = (current_price - pos["entry"]) / pos["entry"] * 100 if is_long else (pos["entry"] - current_price) / pos["entry"] * 100
                         if profit_pct > 1.0:
                             trail_dist_pct = cfg["params"]["sl_pct"] * mode_config["trail_mult"]
@@ -290,7 +270,6 @@ def main():
                                 new_trail = pos.get("lowest", current_price) * (1 + trail_dist_pct / 100)
                                 if new_trail < pos["trailing_stop"]: pos["trailing_stop"] = new_trail
 
-                        # Проверка условий выхода
                         exit_reason = None
                         if is_long:
                             if current_price <= pos["trailing_stop"]: exit_reason = "TRAILING_STOP"
@@ -302,10 +281,7 @@ def main():
                         if not exit_reason and now_time >= datetime.fromisoformat(pos["exit_time"]):
                             exit_reason = "TIME_EXIT"
 
-                        # Закрытие позиции
                         if exit_reason:
-                            # ШАГ 1: ордер. Если не прошёл — позицию НЕ трогаем,
-                            # попытка повторится на следующем прогоне.
                             try:
                                 close_dir = OrderDirection.ORDER_DIRECTION_SELL if is_long else OrderDirection.ORDER_DIRECTION_BUY
                                 client.sandbox.post_sandbox_order(figi=figi, quantity=pos["qty"], direction=close_dir, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
@@ -313,17 +289,13 @@ def main():
                                 log.error(f"Sell error {pos_key}: {e} — позиция остаётся открытой")
                                 continue
 
-                            # ШАГ 2: позиция реально закрыта — удаляем из стейта НЕМЕДЛЕННО.
-                            # Ни одна ошибка ниже не приведёт к фантомному повторному закрытию.
                             state["positions"].pop(pos_key, None)
                             log.info(f"Закрытие {pos_key}: {exit_reason}")
 
-                            # ШАГ 3: учёт и уведомления (ошибки здесь уже безопасны)
                             try:
                                 entry_time = datetime.fromisoformat(pos.get("entry_time", now_time.isoformat()))
                                 duration_hours = round((now_time - entry_time).total_seconds() / 3600, 2)
 
-                                # Расчет PnL
                                 if is_long: pnl_pct = (current_price - pos["entry"]) / pos["entry"] * 100
                                 else: pnl_pct = (pos["entry"] - current_price) / pos["entry"] * 100
                                 pnl_rub = pnl_pct / 100 * pos["entry"] * pos["qty"] * lot
@@ -331,12 +303,10 @@ def main():
                                 rub_balance += pos["entry"] * pos["qty"] * lot + pnl_rub
                                 result_str = "WIN" if pnl_pct > 0 else "LOSS"
 
-                                # Заморозка при лоссе
                                 if result_str == "LOSS":
                                     cooldown_hours = 0.5 if mode == "intraday" else 1.0
                                     state["cooldown"][pos_key] = (now_time + timedelta(hours=cooldown_hours)).isoformat()
 
-                                # === ОБНОВЛЕНИЕ ОНЛАЙН-МОДЕЛИ ===
                                 model_key = f"{mode}_{side}"
                                 if model_key in models and "custom_online" in cfg.get("source", ""):
                                     try:
@@ -350,7 +320,6 @@ def main():
                                             log.info(f"Online model updated for {model_key} with y={y}")
                                     except Exception as e: log.error(f"Online model update error: {e}")
 
-                                # Запись в историю и сообщение
                                 trade_record = {
                                     "ticker": ticker, "mode": mode, "side": side, "type": "SELL", "result": result_str,
                                     "entry_time": pos.get("entry_time"), "entry_price": round(pos["entry"], 2),
@@ -379,15 +348,9 @@ def main():
                             except Exception as e:
                                 log.error(f"Учёт закрытия {pos_key}: {e}")
 
-                    # === ЛОГИКА ВХОДА (Только в торговые часы) ===
+                    # === ЛОГИКА ВХОДА (БЕЗ ЛИМИТОВ) ===
                     if pos_key not in state["positions"]:
-                        # Если сейчас не торговое время, пропускаем открытие новых сделок
                         if not is_trading_hours: continue
-
-                        if mode == "intraday" and state["daily_trades"].get("intraday", 0) >= MAX_INTRADAY_TRADES:
-                            log.info(f"{pos_key}: вход заблокирован — дневной лимит ({MAX_INTRADAY_TRADES}) исчерпан"); continue
-                        if mode == "swing" and state["daily_trades"].get("swing", 0) >= MAX_SWING_TRADES:
-                            log.info(f"{pos_key}: вход заблокирован — дневной лимит ({MAX_SWING_TRADES}) исчерпан"); continue
 
                         if pos_key in state["cooldown"]:
                             if now_time < datetime.fromisoformat(state["cooldown"][pos_key]):
@@ -436,12 +399,10 @@ def main():
                                 continue
 
                             try:
-                                # Для лонга покупаем, для шорта продаем
                                 open_dir = OrderDirection.ORDER_DIRECTION_BUY if side == "long" else OrderDirection.ORDER_DIRECTION_SELL
                                 client.sandbox.post_sandbox_order(figi=figi, quantity=1, direction=open_dir, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
 
                                 entry_price = current_price
-                                # Расчет TP/SL
                                 if side == "long":
                                     tp_price = entry_price * (1 + cfg["params"]["tp_pct"] / 100)
                                     sl_price = entry_price * (1 - cfg["params"]["sl_pct"] / 100)
@@ -451,12 +412,11 @@ def main():
 
                                 exit_time = now_time + timedelta(hours=cfg["params"]["time_exit_h"])
                                 rub_balance -= trade_cost
-                                state["daily_trades"][mode] = state["daily_trades"].get(mode, 0) + 1
 
                                 state["positions"][pos_key] = {
                                     "side": side, "entry": entry_price, "qty": 1,
                                     "entry_time": now_time.isoformat(), "entry_prob": prob,
-                                    "entry_features": last_candle[FEATURE_COLS].to_dict(), # Для онлайн-обучения
+                                    "entry_features": last_candle[FEATURE_COLS].to_dict(),
                                     "tp": tp_price, "sl": sl_price,
                                     "trailing_stop": sl_price,
                                     "highest": entry_price, "lowest": entry_price,
@@ -477,7 +437,6 @@ def main():
                                 send_tg(f"{emoji} <b>{action} ({direction_ru}) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nЛот: {lot} шт.\nTP: {tp_price:.2f}₽\nSL: {sl_price:.2f}₽\nВероятность: {prob*100:.0f}%\nОстаток: {rub_balance:.2f}₽\nВремя: {current_klg} КЛГ")
                             except Exception as e: log.error(f"Open error {pos_key}: {e}")
 
-    # Сохранение состояния
     with open(STATE_FILE, "w") as f: json.dump(state, f, indent=2, default=str)
     with open(HISTORY_FILE, "w") as f: json.dump(history, f, indent=2, default=str)
     log.info(f"Simulator done. Позиций в стейте на выходе: {len(state['positions'])}")
