@@ -203,9 +203,9 @@
       },
       "tp": 23.1476,
       "sl": 23.8562,
-      "trailing_stop": 23.8562,
+      "trailing_stop": 23.36544,
       "highest": 23.62,
-      "lowest": 23.46,
+      "lowest": 23.18,
       "exit_time": "2026-11-16T20:16:06.487918+00:00",
       "figi": "TCS50A10C1L6"
     },
@@ -239,9 +239,9 @@
       },
       "tp": 52.92,
       "sl": 54.54,
-      "trailing_stop": 53.8776,
+      "trailing_stop": 53.8272,
       "highest": 54.0,
-      "lowest": 53.45,
+      "lowest": 53.4,
       "exit_time": "2026-11-16T20:16:06.487918+00:00",
       "figi": "BBG004S68CP5"
     }
