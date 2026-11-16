@@ -1,6 +1,6 @@
 # ============================================================
-# T-INVEST - SIMULATOR (LONG/SHORT & ONLINE UPDATE)
-# Version: 8.0
+# T-INVEST - SIMULATOR (LONG/SHORT & ONLINE UPDATE & SWING MULTI-DAY)
+# Version: 8.1
 # Path: t_invest/simulator/t_invest_simulator.py
 # ============================================================
 
@@ -136,13 +136,7 @@ def get_stats_text(ticker, history, now_time):
 
 # --- ОСНОВНОЙ ЦИКЛ ---
 def main():
-    # Проверка времени (торгуем только с 09:00 до 17:50 КЛГ)
-    now_klg = datetime.now(KLG_TZ)
-    if not (9 <= now_klg.hour < 18):
-        log.info(f"Время {now_klg.strftime('%H:%M')} КЛГ. Биржа закрыта. Симулятор спит.")
-        return
-
-    log.info("STARTING SIMULATOR v8.0 (LONG/SHORT & ONLINE UPDATE)")
+    log.info("STARTING SIMULATOR v8.1 (LONG/SHORT & SWING MULTI-DAY)")
     config = load_config()
 
     if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
@@ -181,6 +175,10 @@ def main():
     now_time = datetime.now(timezone.utc)
     current_klg = now_time.astimezone(KLG_TZ).strftime("%d.%m.%Y %H:%M")
     today_str = now_time.astimezone(KLG_TZ).strftime("%Y-%m-%d")
+
+    # Проверка: можем ли мы открывать НОВЫЕ сделки (с 9 до 18 по КЛГ)
+    now_klg = now_time.astimezone(KLG_TZ)
+    is_trading_hours = (9 <= now_klg.hour < 18)
 
     # Сброс дневных лимитов
     if state["daily_trades"].get("date") != today_str:
@@ -252,7 +250,7 @@ def main():
                     pos_key = f"{ticker}_{mode}_{side}"
                     mode_config = config.get(mode, DEFAULT_CONFIG[mode])
 
-                    # === ЛОГИКА ВЫХОДА ===
+                    # === ЛОГИКА ВЫХОДА (Работает 24/7 для Swing) ===
                     if pos_key in state["positions"]:
                         pos = state["positions"][pos_key]
                         is_long = (pos["side"] == "long")
@@ -353,8 +351,11 @@ def main():
                             except Exception as e:
                                 log.error(f"Sell error {pos_key}: {e}")
 
-                    # === ЛОГИКА ВХОДА ===
+                    # === ЛОГИКА ВХОДА (Только в торговые часы) ===
                     if pos_key not in state["positions"]:
+                        # Если сейчас не торговое время, пропускаем открытие новых сделок
+                        if not is_trading_hours: continue
+                        
                         if mode == "intraday" and state["daily_trades"].get("intraday", 0) >= MAX_INTRADAY_TRADES: continue
                         if mode == "swing" and state["daily_trades"].get("swing", 0) >= MAX_SWING_TRADES: continue
 
