@@ -1025,5 +1025,22 @@
     "pnl_pct": 1.11,
     "pnl_rub": 3.4,
     "balance_after": 9997.2
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-16T08:16:06.487918+00:00",
+    "entry_price": 54.0,
+    "entry_prob": "0.4605452",
+    "exit_time": "2026-11-16T12:01:36.903561+00:00",
+    "exit_price": 53.75,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 3.76,
+    "pnl_pct": 0.46,
+    "pnl_rub": 0.25,
+    "balance_after": 9439.6
   }
 ]
