@@ -1,53 +1,57 @@
 {
   "trainer_version": "7.0-long-only-report-sep",
-  "updated_at": "2026-11-15T06:31:32.218855+00:00",
+  "updated_at": "2026-11-16T06:31:34.019502+00:00",
   "long_tickers": [
-    "MVID",
+    "EUTR",
     "SMLT",
     "ETLN",
-    "VKCO",
+    "MVID",
     "LSRG"
   ],
   "intraday": {
     "long": {
       "params": {
-        "tp_pct": 2.0,
-        "sl_pct": 1.0,
+        "rsi_quantile": 0.2,
+        "vol_multiplier": 1.0,
+        "tp_atr_mult": 2.0,
+        "sl_atr_mult": 1.5,
         "time_exit_h": 12,
-        "model_type": "logreg"
+        "model_type": "custom_dynamic"
       },
       "metrics": {
-        "trades": 109,
-        "pnl": 6.51,
-        "winrate": 0.4862,
-        "max_dd": -2.2,
-        "score": 2.96
+        "trades": 3,
+        "pnl": -0.33,
+        "winrate": 0.0,
+        "max_dd": -0.32,
+        "score": -0.1,
+        "raw_score": -1.03
       },
-      "model_path": "t_invest/data/model/best_intraday_long.pkl",
-      "source": "model_logreg"
+      "source": "model_custom"
     }
   },
   "swing": {
     "long": {
       "params": {
-        "tp_pct": 8.0,
-        "sl_pct": 3.0,
-        "time_exit_h": 24,
-        "model_type": "logreg"
+        "rsi_quantile": 0.2,
+        "vol_multiplier": 1.0,
+        "tp_atr_mult": 2.0,
+        "sl_atr_mult": 1.5,
+        "time_exit_h": 12,
+        "model_type": "custom_dynamic"
       },
       "metrics": {
-        "trades": 47,
-        "pnl": 12.49,
-        "winrate": 0.5532,
-        "max_dd": -1.49,
-        "score": 8.37
+        "trades": 3,
+        "pnl": -0.33,
+        "winrate": 0.0,
+        "max_dd": -0.32,
+        "score": -0.1,
+        "raw_score": -1.03
       },
-      "model_path": "t_invest/data/model/best_swing_long.pkl",
-      "source": "model_logreg"
+      "source": "model_custom"
     }
   },
   "stats": {
-    "total_rows": 7960,
-    "elapsed_seconds": 662
+    "total_rows": 7943,
+    "elapsed_seconds": 960
   }
 }
