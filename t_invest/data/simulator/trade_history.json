@@ -929,5 +929,23 @@
     "pnl_pct": -1.95,
     "pnl_rub": -18.0,
     "balance_after": 9383.76
+  },
+  {
+    "ticker": "MVID",
+    "mode": "swing",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-16T08:01:31.925058+00:00",
+    "entry_price": 53.8,
+    "entry_prob": 0.5832
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "swing",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-16T08:01:31.925058+00:00",
+    "entry_price": 23.68,
+    "entry_prob": 0.6271
   }
 ]
