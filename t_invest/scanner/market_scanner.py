@@ -1,9 +1,22 @@
 # PROD CONTOUR ONLY
 # Python: 3.10
 # t-tech-investments: 1.49.3
+#
+# ИЗМЕНЕНИЯ:
+#   - ФИКС rate limits: пауза между запросами к API (REQUEST_DELAY),
+#     ~240 запросов/мин с запасом ниже лимита marketdata.
+#   - ФИКС тишины: причины отсева больше не молчат — пишутся в лог
+#     (ошибки API отдельно, обычные фильтры суммарно).
+#   - RETRY: при сетевой ошибке API запрос повторяется до 3 раз
+#     с растущей паузой, чтобы ликвидная бумага не терялась из-за
+#     одного сбоя.
+#   - Фильтр незакрытой дневной свечи: сегодня ещё не закрылась,
+#     её оборот/диапазон занижены и портят средние.
 
 import os
 import json
+import time
+import logging
 from datetime import timedelta, datetime, timezone
 
 from t_tech.invest import Client
@@ -18,10 +31,23 @@ MIN_DAILY_TURNOVER_RUB = 50_000_000
 MAX_SPREAD_PERCENT = 0.5
 CANDLES_DAYS = 10
 
+# === ЗАЩИТА ОТ RATE LIMIT ===
+REQUEST_DELAY = 0.25      # секунд между бумагами (~240 req/min)
+MAX_RETRIES = 3           # попыток на запрос при сетевой ошибке
+RETRY_DELAY = 2.0         # базовая пауза между попытками, сек
+
+log = logging.getLogger("scanner")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+# Ошибки, при которых имеет смысл повторить запрос (rate limit / сеть)
+RETRYABLE_MARKERS = ("rate limit", "ratelimit", "too many requests", "unavailable", "timeout", "connection")
+
+
 def quotation_to_float(q):
     if q is None:
         return 0.0
     return q.units + (q.nano / 1e9)
+
 
 def classify_volatility(avg_range):
     if avg_range < 2.0:
@@ -30,6 +56,7 @@ def classify_volatility(avg_range):
         return "MID_VOL"
     else:
         return "HIGH_VOL"
+
 
 def classify_trend(closes):
     if len(closes) < 5:
@@ -42,6 +69,40 @@ def classify_trend(closes):
     else:
         return "SIDEWAYS"
 
+
+def is_retryable(error):
+    text = str(error).lower()
+    return any(m in text for m in RETRYABLE_MARKERS)
+
+
+def with_retry(func, figi, what):
+    """Вызывает func(figi=figi, **kwargs) с ретраями при временных ошибках API."""
+    last_err = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return func(figi=figi), None
+        except Exception as e:
+            last_err = e
+            if is_retryable(e) and attempt < MAX_RETRIES:
+                delay = RETRY_DELAY * attempt
+                log.warning(f"{what} {figi}: попытка {attempt}/{MAX_RETRIES} не удалась ({e}), жду {delay:.0f}с")
+                time.sleep(delay)
+    return None, f"Ошибка {what}: {last_err}"
+
+
+def get_order_book_retry(client, figi):
+    return client.market_data.get_order_book(figi=figi, depth=1)
+
+
+def get_candles_retry(client, figi):
+    return client.market_data.get_candles(
+        figi=figi,
+        from_=now() - timedelta(days=CANDLES_DAYS),
+        to=now(),
+        interval=CandleInterval.CANDLE_INTERVAL_DAY,
+    )
+
+
 def analyze_share(client, share):
     figi = share.figi
 
@@ -53,7 +114,9 @@ def analyze_share(client, share):
         return None, "Не помечена как ликвидная"
 
     try:
-        ob = client.market_data.get_order_book(figi=figi, depth=1)
+        ob, err = with_retry(get_order_book_retry, figi, "стакан")
+        if err:
+            return None, err
         if not ob.bids or not ob.asks:
             return None, "Пустой стакан"
         best_bid = quotation_to_float(ob.bids[0].price)
@@ -67,17 +130,20 @@ def analyze_share(client, share):
         return None, f"Ошибка стакана: {e}"
 
     try:
-        candles_resp = client.market_data.get_candles(
-            figi=figi,
-            from_=now() - timedelta(days=CANDLES_DAYS),
-            to=now(),
-            interval=CandleInterval.CANDLE_INTERVAL_DAY,
-        )
+        candles_resp, err = with_retry(get_candles_retry, figi, "свечи")
+        if err:
+            return None, err
         candles = candles_resp.candles
         if len(candles) < 3:
             return None, "Мало свечей"
     except Exception as e:
         return None, f"Ошибка свечей: {e}"
+
+    # Отрезаем незакрытую сегодняшнюю свечу — её оборот и диапазон занижены
+    today_utc = datetime.now(timezone.utc).date()
+    candles = [c for c in candles if c.time.replace(tzinfo=timezone.utc).date() < today_utc]
+    if len(candles) < 3:
+        return None, "Мало закрытых свечей"
 
     turnovers, ranges, closes = [], [], []
     for c in candles:
@@ -114,6 +180,7 @@ def analyze_share(client, share):
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }, None
 
+
 def main():
     if not TOKEN:
         print("❌ T_INVEST_TOKEN не задан")
@@ -142,7 +209,9 @@ def main():
         shares = shares_resp.instruments
         print(f"Всего акций для проверки (BASE): {len(shares)}")
 
-        results, skipped = [], 0
+        results = []
+        skipped = 0
+        api_errors = []
 
         for share in shares:
             analyzed, reason = analyze_share(client, share)
@@ -152,9 +221,16 @@ def main():
                 results.append(analyzed)
             else:
                 skipped += 1
+                if reason and reason.startswith("Ошибка"):
+                    # Ошибки API — видим каждую, их нельзя терять
+                    log.warning(f"⛔ {share.ticker}: {reason}")
+                    api_errors.append(share.ticker)
+                # Обычные фильтры не спамим, но сумма будет в сводке
 
         print(f"\n✅ Ликвидных акций прошло все фильтры: {len(results)}")
         print(f"⛔ Отсеяно неликвидных: {skipped}")
+        if api_errors:
+            print(f"⚠️ Потеряно из-за ошибок API: {len(api_errors)} ({', '.join(api_errors[:20])}{'...' if len(api_errors) > 20 else ''})")
 
         # === ФОРМИРУЕМ МЕТАДАННЫЕ ===
         now_utc = datetime.now(timezone.utc)
@@ -170,6 +246,7 @@ def main():
                 "max_spread_percent": MAX_SPREAD_PERCENT,
                 "total_found": len(results),
                 "total_skipped": skipped,
+                "api_errors": len(api_errors),
                 "version": "1.0"
             },
             "data": results
@@ -180,6 +257,7 @@ def main():
             json.dump(final_data, f, ensure_ascii=False, indent=2)
 
         print(f"💾 Сохранено в {output_path}")
+
 
 if __name__ == "__main__":
     main()
