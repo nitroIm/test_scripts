@@ -1,5 +1,6 @@
 # ============================================================
 # T-INVEST - TRAINER ORCHESTRATOR (LONG & SHORT, ONLINE CUSTOM)
+# Version: 7.3
 # Path: t_invest/learn/t_invest_learn.py
 # ============================================================
 
@@ -11,7 +12,8 @@ from t_tech.invest.constants import INVEST_GRPC_API
 from t_tech.invest.schemas import CandleInterval
 from t_tech.invest.utils import now
 
-VERSION = "7.3-online-custom"
+# --- КОНФИГУРАЦИЯ ---
+VERSION = "7.3-online-custom-180d"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("t_invest.trainer")
 
@@ -25,8 +27,51 @@ HISTORY_DAYS = 180
 
 MODEL_OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-# ... (функции calculate_ema, calculate_rsi, calculate_macd, calculate_atr, fetch_data, add_indicators, load_models остаются без изменений)
+# --- ИНДИКАТОРЫ ---
+def calculate_ema(s, p): return s.ewm(span=p, adjust=False).mean()
+def calculate_rsi(s, p=14):
+    d = s.diff(); g = (d.where(d > 0, 0)).rolling(window=p).mean(); l = (-d.where(d < 0, 0)).rolling(window=p).mean()
+    return 100 - (100 / (1 + g/l))
+def calculate_macd(s, f=12, sl=26, sig=9):
+    m = calculate_ema(s, f) - calculate_ema(s, sl); return m - calculate_ema(m, sig)
+def calculate_atr(df, p=14):
+    tr = pd.concat([df['high']-df['low'], (df['high']-df['close'].shift()).abs(), (df['low']-df['close'].shift()).abs()], axis=1).max(axis=1)
+    return tr.rolling(window=p).mean()
 
+# --- ЗАГРУЗКА ДАННЫХ ---
+def fetch_data(client, figi, days=HISTORY_DAYS):
+    end = now(); start = end - timedelta(days=days); all_c = []; cur = start
+    while cur < end:
+        c_end = min(cur + timedelta(days=90), end)
+        try:
+            resp = client.market_data.get_candles(figi=figi, from_=cur, to=c_end, interval=CandleInterval.CANDLE_INTERVAL_HOUR)
+            all_c.extend(resp.candles)
+        except: pass
+        cur = c_end
+    if not all_c: return pd.DataFrame()
+    rows = [{"open_time": c.time, "open": c.open.units+c.open.nano/1e9, "high": c.high.units+c.high.nano/1e9, "low": c.low.units+c.low.nano/1e9, "close": c.close.units+c.close.nano/1e9, "volume": c.volume} for c in all_c]
+    df = pd.DataFrame(rows); df['open_time'] = pd.to_datetime(df['open_time'], utc=True); return df
+
+def add_indicators(df):
+    df['rsi'] = calculate_rsi(df['close'], 14); df['rsi_7'] = calculate_rsi(df['close'], 7); df['rsi_21'] = calculate_rsi(df['close'], 21)
+    df['macd_hist'] = calculate_macd(df['close']); df['ema_50'] = calculate_ema(df['close'], 50); df['ema_20'] = calculate_ema(df['close'], 20); df['ema_200'] = calculate_ema(df['close'], 200)
+    df['vol_sma'] = df['volume'].rolling(window=20).mean()
+    df['atr_7'] = calculate_atr(df, 7); df['atr_14'] = calculate_atr(df, 14); df['atr_50'] = calculate_atr(df, 50); df['atr_100'] = calculate_atr(df, 100)
+    df['price_change_1h'] = df['close'].pct_change(1); df['price_change_4h'] = df['close'].pct_change(4); df['price_change_24h'] = df['close'].pct_change(24)
+    return df.dropna()
+
+# --- ЗАГРУЗКА МОДЕЛЕЙ ---
+def load_models():
+    models = []
+    for f in MODELS_SRC_DIR.glob("model_*.py"):
+        name = f.stem
+        try:
+            spec = importlib.util.spec_from_file_location(name, f); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+            if hasattr(mod, "train"): models.append((name, mod))
+        except Exception as e: log.error(f"Failed to load {name}: {e}")
+    return models
+
+# --- ОСНОВНОЙ ЦИКЛ ---
 def main():
     start_time = time.time()
     log.info(f"STARTING TRAINER v{VERSION}")
@@ -51,6 +96,7 @@ def main():
     full_df = pd.concat(dfs).sort_values('open_time').reset_index(drop=True) if dfs else pd.DataFrame()
     models = load_models()
 
+    # Структура для сохранения
     out_data = {
         "trainer_version": VERSION,
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -60,6 +106,7 @@ def main():
         "swing": {"long": None, "short": None}
     }
 
+    # ЦИКЛ: 2 РЕЖИМА x 2 СТОРОНЫ
     for mode in ["intraday", "swing"]:
         for side in ["long", "short"]:
             log.info(f"--- Searching best model for {mode.upper()} / {side.upper()} ---")
@@ -85,11 +132,10 @@ def main():
                         os.replace(old_p, new_p)
                         best_model_data["model_path"] = str(new_p)
 
-    out_data["stats"] = {
-        "total_rows": len(full_df),
-        "elapsed_seconds": int(time.time() - start_time)
-    }
+    # Статистика
+    out_data["stats"] = {"total_rows": len(full_df), "elapsed_seconds": int(time.time() - start_time)}
 
+    # Очистка старых файлов
     for pkl in MODEL_OUT_FILE.parent.glob("*.pkl"):
         if "best_" not in pkl.name:
             pkl.unlink()
