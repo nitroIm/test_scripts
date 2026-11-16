@@ -1,9 +1,9 @@
 # ============================================================
-# T-INVEST - SIMULATOR (SANDBOX) WITH COOLDOWN & SMART TRAILING
+# T-INVEST - SIMULATOR (ONLINE LEARNING UPDATE)
 # Path: t_invest/simulator/t_invest_simulator.py
 # ============================================================
 
-import os, sys, json, logging, joblib, requests
+import os, sys, json, logging, joblib, requests, pickle
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -16,388 +16,120 @@ from t_tech.invest.utils import now
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("simulator")
 
-# --- НАСТРОЙКИ ---
-TOKEN = os.environ.get("T_INVEST_TOKEN")
-TG_TOKEN = os.environ.get("INVEST_BOT_TOKEN")
-TG_CHAT_ID = os.environ.get("INVEST_BOT_CHAT_ID")
-
-BEST_PARAMS_FILE = Path("t_invest/data/model/best_params.json")
-WHITELIST_FILE = Path("t_invest/data/scanner/whitelist.json")
-STATE_FILE = Path("t_invest/data/simulator/state.json")
-HISTORY_FILE = Path("t_invest/data/simulator/trade_history.json")
-NEWS_SCORES_FILE = Path("t_invest/data/news/t_invest_news_scores.json")
-CONFIG_FILE = Path("t_invest/data/simulator/simulator_config.json")
-
-FEATURE_COLS = ["open", "high", "low", "close", "volume", "rsi", "rsi_7", "rsi_21", "macd_hist", "ema_20", "ema_50", "ema_200", "vol_sma", "atr_7", "atr_14", "atr_50", "atr_100", "price_change_1h", "price_change_4h", "price_change_24h"]
-
-KLG_TZ = timezone(timedelta(hours=2))
-
-DEFAULT_CONFIG = {
-    "intraday": {"min_prob": 0.45, "trail_mult": 0.8, "news_block": -0.5},
-    "swing": {"min_prob": 0.45, "trail_mult": 0.8, "news_block": -0.5}
-}
-
-def load_config():
-    if not CONFIG_FILE.exists():
-        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_CONFIG, f, indent=2)
-        return DEFAULT_CONFIG
-    try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return DEFAULT_CONFIG
-
-def send_tg(text):
-    if not TG_TOKEN or not TG_CHAT_ID: return
-    try:
-        requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage", json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True}, timeout=10)
-    except: pass
-
-def q2f(q): return q.units + q.nano / 1e9
-
-def calc_ema(s, p): return s.ewm(span=p, adjust=False).mean()
-def calc_rsi(s, p=14):
-    d = s.diff(); g = (d.where(d>0,0)).rolling(window=p).mean(); l = (-d.where(d<0,0)).rolling(window=p).mean()
-    return 100 - (100 / (1 + g/l))
-def calc_macd(s, f=12, sl=26, sig=9):
-    m = calc_ema(s, f) - calc_ema(s, sl); return m - calc_ema(m, sig)
-def calc_atr(df, p=14):
-    tr = pd.concat([df['high']-df['low'], (df['high']-df['close'].shift()).abs(), (df['low']-df['close'].shift()).abs()], axis=1).max(axis=1)
-    return tr.rolling(window=p).mean()
-
-def compute_features(df):
-    df['rsi'] = calc_rsi(df['close'], 14); df['rsi_7'] = calc_rsi(df['close'], 7); df['rsi_21'] = calc_rsi(df['close'], 21)
-    df['macd_hist'] = calc_macd(df['close']); df['ema_50'] = calc_ema(df['close'], 50); df['ema_20'] = calc_ema(df['close'], 20); df['ema_200'] = calc_ema(df['close'], 200)
-    df['vol_sma'] = df['volume'].rolling(window=20).mean()
-    df['atr_7'] = calc_atr(df, 7); df['atr_14'] = calc_atr(df, 14); df['atr_50'] = calc_atr(df, 50); df['atr_100'] = calc_atr(df, 100)
-    df['price_change_1h'] = df['close'].pct_change(1); df['price_change_4h'] = df['close'].pct_change(4); df['price_change_24h'] = df['close'].pct_change(24)
-    return df
-
-def fetch_h1_candles(client, figi, count=720):
-    try:
-        resp = client.market_data.get_candles(figi=figi, from_=now()-timedelta(hours=count), to=now(), interval=CandleInterval.CANDLE_INTERVAL_HOUR)
-        rows = [{"time": c.time, "open": q2f(c.open), "high": q2f(c.high), "low": q2f(c.low), "close": q2f(c.close), "volume": c.volume} for c in resp.candles]
-        df = pd.DataFrame(rows)
-        df['time'] = pd.to_datetime(df['time'], utc=True)
-        return df
-    except Exception as e:
-        log.error(f"Error fetching H1 {figi}: {e}")
-        return pd.DataFrame()
-
-def get_last_price(client, figi):
-    try:
-        resp = client.market_data.get_last_prices(figi=[figi])
-        if resp.last_prices: return q2f(resp.last_prices[0].price)
-    except Exception as e:
-        log.error(f"Error fetching last price {figi}: {e}")
-    return 0.0
-
-def load_news_scores():
-    if not NEWS_SCORES_FILE.exists(): return {}
-    try:
-        with open(NEWS_SCORES_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e: return {}
-
-def get_stats_text(ticker, history, now_time):
-    today_str = now_time.strftime("%Y-%m-%d")
-    today_wins = 0; today_losses = 0
-    ticker_wins = 0; ticker_losses = 0
-    first_trade_dt = None
-
-    for record in history:
-        if record.get("type") == "BUY" and "entry_time" in record:
-            try:
-                dt = datetime.fromisoformat(record["entry_time"])
-                if first_trade_dt is None or dt < first_trade_dt: first_trade_dt = dt
-            except: pass
-
-        if record.get("type") == "SELL":
-            res = record.get("result"); t = record.get("ticker")
-            exit_time_str = record.get("exit_time", "")
-
-            if t == ticker:
-                if res == "WIN": ticker_wins += 1
-                elif res == "LOSS": ticker_losses += 1
-
-            if exit_time_str.startswith(today_str):
-                if res == "WIN": today_wins += 1
-                elif res == "LOSS": today_losses += 1
-
-    total_today = today_wins + today_losses
-    winrate = (today_wins / total_today * 100) if total_today > 0 else 0.0
-    total_ticker = ticker_wins + ticker_losses
-
-    first_trade_str = "Неизвестно"
-    if first_trade_dt:
-        days_active = (now_time - first_trade_dt).days + 1
-        first_trade_str = f"{first_trade_dt.astimezone(KLG_TZ).strftime('%d.%m.%Y')} ({days_active} дн.)"
-
-    return (
-        f"\n\n📊 <b>Статистика за сегодня ({today_str}):</b>\n"
-        f"Всего: {total_today} (WIN: {today_wins}, LOSS: {today_losses})\n"
-        f"Винрейт: {winrate:.1f}%\n\n"
-        f"🎯 <b>По тикеру {ticker}:</b>\n"
-        f"Всего: {total_ticker} (WIN: {ticker_wins}, LOSS: {ticker_losses})\n\n"
-        f"📅 <b>Симулятор в работе с:</b> {first_trade_str}"
-    )
+# ... (настройки, FEATURE_COLS, DEFAULT_CONFIG, load_config, send_tg, q2f, calc_... остаются без изменений)
 
 def main():
-    log.info("STARTING SIMULATOR (SMART TRAILING & SHORT COOLDOWN)")
+    # ... (начало main без изменений)
     config = load_config()
 
-    if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
-        log.error("best_params.json or whitelist.json not found"); return
-
-    with open(BEST_PARAMS_FILE) as f: params_data = json.load(f)
-    with open(WHITELIST_FILE) as f: wl_data = json.load(f)
-    
-    wl_stocks = wl_data["data"] if isinstance(wl_data, dict) and "data" in wl_data else wl_data
-    figi_map = {s["ticker"]: s["figi"] for s in wl_stocks}
-    
-    cfg_intraday = params_data.get("intraday", {}).get("long")
-    cfg_swing = params_data.get("swing", {}).get("long")
-
-    if not cfg_intraday and not cfg_swing:
-        log.error("No params for intraday or swing"); return
-    
-    tickers = set(params_data.get("long_tickers", []))
-    if cfg_intraday: tickers.update(params_data.get("long_tickers", []))
-    
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    state = {"positions": {}, "last_h1_candle": {}, "cooldown": {}, "deposit_v3": False, "alert_sent_v3": False}
-    
-    if STATE_FILE.exists():
-        try:
-            with open(STATE_FILE) as f: loaded_state = json.load(f)
-            if isinstance(loaded_state, dict):
-                for k, v in loaded_state.items(): state[k] = v
-        except: pass
-        
-    if "positions" not in state: state["positions"] = {}
-    if "last_h1_candle" not in state: state["last_h1_candle"] = {}
-    if "cooldown" not in state: state["cooldown"] = {}
-        
-    history = []
-    if HISTORY_FILE.exists():
-        try:
-            with open(HISTORY_FILE) as f: history = json.load(f)
-        except: pass
-    
-    news_scores = load_news_scores()
-    now_time = datetime.now(timezone.utc)
-    current_klg = now_time.astimezone(KLG_TZ).strftime("%d.%m.%Y %H:%M")
+    # ... (загрузка данных, state, history, news_scores)
 
     models = {}
-    if cfg_intraday and cfg_intraday.get("model_path"):
-        p = cfg_intraday["model_path"]
-        if Path(p).exists(): models["intraday"] = joblib.load(p)
-    if cfg_swing and cfg_swing.get("model_path"):
-        p = cfg_swing["model_path"]
-        if Path(p).exists(): models["swing"] = joblib.load(p)
+    # Загружаем ML-модели (joblib) и онлайн-модель (pickle)
+    for mode in ["intraday", "swing"]:
+        for side in ["long", "short"]:
+            cfg = params_data.get(mode, {}).get(side)
+            if cfg and cfg.get("model_path"):
+                p = Path(cfg["model_path"])
+                if p.exists():
+                    if "custom_online" in cfg.get("source", ""):
+                        with open(p, "rb") as f:
+                            models[f"{mode}_{side}"] = pickle.load(f)
+                    else:
+                        models[f"{mode}_{side}"] = joblib.load(p)
 
     with Client(TOKEN, target=INVEST_GRPC_API_SANDBOX) as client:
-        accounts = client.users.get_accounts()
-        if not accounts.accounts: 
-            try:
-                new_acc = client.sandbox.open_sandbox_account()
-                acc_id = new_acc.account_id
-            except Exception as e:
-                log.error(f"Failed to create sandbox account: {e}"); return
-        else:
-            acc_id = accounts.accounts[0].id
-
-        rub_balance = 0.0
-        try:
-            positions = client.operations.get_positions(account_id=acc_id)
-            for m in positions.money:
-                if m.currency == "rub":
-                    rub_balance = q2f(m); break
-
-            if not state.get("deposit_v3", False):
-                if rub_balance < 10:
-                    client.sandbox.sandbox_pay_in(account_id=acc_id, amount=MoneyValue(currency="rub", units=10000, nano=0))
-                    rub_balance = 10000.0
-                state["deposit_v3"] = True
-                state["alert_sent_v3"] = False
-            else:
-                log.info(f"Текущий баланс: {rub_balance:.2f} ₽.")
-                
-            if rub_balance > 1000: state["alert_sent_v3"] = False
-                
-        except Exception as e:
-            log.warning(f"Баланс: {e}")
+        # ... (аккаунт, баланс)
 
         for ticker in tickers:
-            figi = figi_map.get(ticker)
-            if not figi: continue
+            # ... (получение свечей, last_candle, lot)
 
-            current_price = get_last_price(client, figi)
-            if current_price <= 0: continue
+            for mode in ["intraday", "swing"]:
+                for side in ["long", "short"]:
+                    pos_key = f"{ticker}_{mode}_{side}"
+                    mode_config = config.get(mode, DEFAULT_CONFIG[mode])
 
-            df_h1 = fetch_h1_candles(client, figi)
-            if len(df_h1) < 200: continue
-                
-            last_candle_time = df_h1.iloc[-1]['time'].isoformat()
-            df_h1 = compute_features(df_h1).dropna()
-            if df_h1.empty: continue
-                
-            last_candle = df_h1.iloc[-1]
-            lot = next((s['lot'] for s in wl_stocks if s['ticker'] == ticker), 1)
+                    # === ВЫХОД ===
+                    if pos_key in state["positions"]:
+                        pos = state["positions"][pos_key]
+                        # ... (логика выхода для long и short)
 
-            for mode, cfg in [("intraday", cfg_intraday), ("swing", cfg_swing)]:
-                if not cfg: continue
-                pos_key = f"{ticker}_{mode}"
-                mode_config = config.get(mode, DEFAULT_CONFIG[mode])
+                        if exit_reason:
+                            try:
+                                # ... (закрытие ордера, расчет pnl)
 
-                # === ВЫХОД ===
-                if pos_key in state["positions"]:
-                    pos = state["positions"][pos_key]
-                    if current_price > pos["highest"]: pos["highest"] = current_price
-                    
-                    # УМНЫЙ ТРЕЙЛИНГ: подтягиваем только если в плюсе хотя бы на 1%
-                    profit_pct = (pos["highest"] - pos["entry"]) / pos["entry"] * 100
-                    if profit_pct > 1.0:
-                        trail_dist_pct = cfg["params"]["sl_pct"] * mode_config["trail_mult"]
-                        new_trail = pos["highest"] * (1 - trail_dist_pct / 100)
-                        if new_trail > pos["trailing_stop"]:
-                            pos["trailing_stop"] = new_trail
+                                result_str = "WIN" if pnl_pct > 0 else "LOSS"
 
-                    exit_reason = None
-                    if current_price <= pos["trailing_stop"]: exit_reason = "TRAILING_STOP"
-                    elif current_price >= pos["tp"]: exit_reason = "TAKE_PROFIT"
-                    elif now_time >= datetime.fromisoformat(pos["exit_time"]): exit_reason = "TIME_EXIT"
+                                # === ОБНОВЛЕНИЕ ОНЛАЙН-МОДЕЛИ ===
+                                model_key = f"{mode}_{side}"
+                                if model_key in models and "custom_online" in params_data.get(mode, {}).get(side, {}).get("source", ""):
+                                    try:
+                                        model = models[model_key]
+                                        # Признаки на момент входа (сохранены в pos)
+                                        x = pos.get("entry_features")
+                                        if x:
+                                            y = 1 if result_str == "WIN" else 0
+                                            model.learn_one(x, y)
+                                            # Сохраняем обновленную модель
+                                            model_path = params_data[mode][side]["model_path"]
+                                            with open(model_path, "wb") as f:
+                                                pickle.dump(model, f)
+                                            log.info(f"Online model updated for {model_key} with y={y}")
+                                    except Exception as e:
+                                        log.error(f"Online model update error: {e}")
 
-                    if exit_reason:
-                        try:
-                            client.sandbox.post_sandbox_order(figi=figi, quantity=pos["qty"], direction=OrderDirection.ORDER_DIRECTION_SELL, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
-                            
-                            entry_time_str = pos.get("entry_time", now_time.isoformat())
-                            entry_time = datetime.fromisoformat(entry_time_str)
-                            duration_hours = round((now_time - entry_time).total_seconds() / 3600, 2)
-                            
-                            pnl_pct = (current_price - pos["entry"]) / pos["entry"] * 100
-                            pnl_rub = (current_price - pos["entry"]) * pos["qty"] * lot
-                            rub_balance += (current_price * pos["qty"] * lot)
-                            
-                            result_str = "WIN" if pnl_pct > 0 else "LOSS"
-                            
-                            # КОРОТКАЯ ЗАМОРОЗКА ПРИ УБЫТКЕ
-                            if result_str == "LOSS":
-                                cooldown_hours = 0.5 if mode == "intraday" else 1.0 # 30 минут или 1 час
-                                state["cooldown"][pos_key] = (now_time + timedelta(hours=cooldown_hours)).isoformat()
-                                log.info(f"{pos_key} LOSS. Заморозка на {cooldown_hours} ч.")
+                                # ... (отправка сообщения, удаление позиции)
 
-                            emoji = "✅" if result_str == "WIN" else "❌"
-                            title = "СДЕЛКА ЗАКРЫТА В ПЛЮС" if result_str == "WIN" else "СДЕЛКА ЗАКРЫТА В МИНУС"
-                            
-                            trade_record = {
-                                "ticker": ticker, "mode": mode, "type": "SELL", "result": result_str,
-                                "entry_time": entry_time_str, "entry_price": round(pos["entry"], 2),
-                                "entry_prob": pos.get("entry_prob", 0.0), "exit_time": now_time.isoformat(),
-                                "exit_price": round(current_price, 2), "reason": exit_reason,
-                                "duration_hours": duration_hours, "pnl_pct": round(pnl_pct, 2),
-                                "pnl_rub": round(pnl_rub, 2), "balance_after": round(rub_balance, 2)
-                            }
-                            
-                            log.info(f"AUDIT_TRADE: {json.dumps(trade_record)}")
-                            history.append(trade_record)
-                            
-                            stats_text = get_stats_text(ticker, history, now_time)
-                            msg_text = (
-                                f"{emoji} <b>{title} {ticker} ({mode.upper()})</b>\n"
-                                f"Причина: {exit_reason}\n"
-                                f"Вход: {pos['entry']:.2f}₽ → Выход: {current_price:.2f}₽\n"
-                                f"Держали: {duration_hours} ч.\n"
-                                f"PnL: {pnl_pct:+.2f}% ({pnl_rub:+.2f}₽)\n"
-                                f"Баланс: {rub_balance:.2f}₽\n"
-                                f"Время: {current_klg} КЛГ"
-                                f"{stats_text}"
-                            )
-                            send_tg(msg_text)
-                            del state["positions"][pos_key]
-                        except Exception as e: log.error(f"Sell error {pos_key}: {e}")
+                            except Exception as e:
+                                log.error(f"Sell error {pos_key}: {e}")
 
-                # === ВХОД ===
-                if pos_key not in state["positions"]:
-                    # ПРОВЕРКА ЗАМОРОЗКИ
-                    if pos_key in state["cooldown"]:
-                        cooldown_until = datetime.fromisoformat(state["cooldown"][pos_key])
-                        if now_time < cooldown_until:
-                            continue # Пропускаем, еще рано
-                        else:
-                            del state["cooldown"][pos_key] # Остыл, можно торговать
+                    # === ВХОД ===
+                    if pos_key not in state["positions"]:
+                        # ... (проверка лимитов, заморозки)
 
-                    model = models.get(mode)
-                    signal = 0
-                    prob = 0.0
-                    
-                    if model is not None:
-                        try:
-                            X = last_candle[FEATURE_COLS].values.reshape(1, -1)
-                            if hasattr(model, "predict_proba"):
-                                prob = model.predict_proba(X)[0][1]
-                                signal = 1 if prob >= mode_config["min_prob"] else 0
-                            else:
-                                signal = int(model.predict(X)[0])
-                                prob = 1.0 if signal == 1 else 0.0
-                        except Exception as e: log.error(f"Pred error {pos_key}: {e}")
-                    elif cfg["source"] == "model_custom":
-                        if last_candle['rsi'] < 30 and last_candle['macd_hist'] > 0:
-                            signal = 1; prob = 1.0
+                        model = models.get(f"{mode}_{side}")
+                        signal = 0
+                        prob = 0.0
 
-                    news_data = news_scores.get(ticker, {})
-                    news_score = news_data.get("score", 0.0) if isinstance(news_data, dict) else 0.0
-                    
-                    log.info(f"{pos_key}: prob={prob:.2f}, news={news_score:.2f}, signal={signal}, balance={rub_balance:.2f}")
+                        if model is not None:
+                            try:
+                                X = last_candle[FEATURE_COLS].values.reshape(1, -1)
+                                if hasattr(model, "predict_proba"):
+                                    prob = model.predict_proba(X)[0][1]
+                                    signal = 1 if prob >= mode_config["min_prob"] else 0
+                                elif hasattr(model, "predict_proba_one"):
+                                    x_dict = last_candle[FEATURE_COLS].to_dict()
+                                    prob = model.predict_proba_one(x_dict).get(1, 0.0)
+                                    signal = 1 if prob >= mode_config["min_prob"] else 0
+                                else:
+                                    signal = int(model.predict(X)[0])
+                                    prob = 1.0 if signal == 1 else 0.0
+                            except Exception as e:
+                                log.error(f"Pred error {pos_key}: {e}")
 
-                    if signal == 1:
-                        if state["last_h1_candle"].get(pos_key) == last_candle_time:
-                            continue
+                        # ... (проверка новостей)
 
-                        if news_score < mode_config["news_block"]:
-                            continue
-                        
-                        trade_cost = current_price * lot
-                        if rub_balance < trade_cost:
-                            if rub_balance < 100 and not state.get("alert_sent_v3", False):
-                                send_tg(f"⚠️ <b>ВНИМАНИЕ! ДЕНЬГИ ЗАКОНЧИЛИСЬ</b>\n\nБаланс: {rub_balance:.2f} ₽.")
-                                state["alert_sent_v3"] = True
-                            continue
-                        
-                        log.info(f"{pos_key} SIGNAL! Buying...")
-                        try:
-                            client.sandbox.post_sandbox_order(figi=figi, quantity=1, direction=OrderDirection.ORDER_DIRECTION_BUY, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
-                            entry_price = current_price
-                            tp_price = entry_price * (1 + cfg["params"]["tp_pct"] / 100)
-                            sl_price = entry_price * (1 - cfg["params"]["sl_pct"] / 100)
-                            exit_time = now_time + timedelta(hours=cfg["params"]["time_exit_h"])
-                            
-                            rub_balance -= trade_cost
-                            
+                        if signal == 1:
+                            # ... (проверка стоимости, открытие позиции)
+
+                            # СОХРАНЯЕМ ПРИЗНАКИ ДЛЯ ОНЛАЙН-ОБНОВЛЕНИЯ
+                            entry_features = last_candle[FEATURE_COLS].to_dict()
+
                             state["positions"][pos_key] = {
-                                "side": "long", "entry": entry_price, "qty": 1,
-                                "entry_time": now_time.isoformat(), "entry_prob": prob,
-                                "tp": tp_price, "sl": sl_price,
-                                "trailing_stop": sl_price, "highest": entry_price,
-                                "exit_time": exit_time.isoformat(), "figi": figi
+                                "side": side,
+                                "entry": entry_price,
+                                "qty": 1,
+                                "entry_time": now_time.isoformat(),
+                                "entry_prob": prob,
+                                "entry_features": entry_features,  # <-- сохраняем признаки
+                                "tp": tp_price,
+                                "sl": sl_price,
+                                "trailing_stop": sl_price,
+                                "highest": entry_price,
+                                "exit_time": exit_time.isoformat(),
+                                "figi": figi
                             }
-                            state["last_h1_candle"][pos_key] = last_candle_time
-                            
-                            history.append({
-                                "ticker": ticker, "mode": mode, "type": "BUY",
-                                "entry_time": now_time.isoformat(), "entry_price": round(entry_price, 2),
-                                "entry_prob": round(prob, 4)
-                            })
-                            
-                            send_tg(f"🟢 <b>ПОКУПКА (LONG) {ticker} [{mode.upper()}]</b>\nЦена: {entry_price:.2f}₽\nЛот: {lot} шт.\nTP: {tp_price:.2f}₽\nSL: {sl_price:.2f}₽\nВероятность: {prob*100:.0f}%\nОстаток: {rub_balance:.2f}₽\nВремя: {current_klg} КЛГ")
-                        except Exception as e: log.error(f"Buy error {pos_key}: {e}")
 
-    with open(STATE_FILE, "w") as f: json.dump(state, f, indent=2, default=str)
-    with open(HISTORY_FILE, "w") as f: json.dump(history, f, indent=2, default=str)
-    log.info("Simulator done.")
+                            # ... (отправка сообщения о покупке/продаже)
 
-if __name__ == "__main__":
-    main()
+    # ... (сохранение state, history)
