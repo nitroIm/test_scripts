@@ -947,5 +947,32 @@
     "entry_time": "2026-11-16T08:01:31.925058+00:00",
     "entry_price": 23.68,
     "entry_prob": 0.6271
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-16T08:16:06.487918+00:00",
+    "entry_price": 305.8,
+    "entry_prob": "0.6283"
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-16T08:16:06.487918+00:00",
+    "entry_price": 23.62,
+    "entry_prob": "0.4798"
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-16T08:16:06.487918+00:00",
+    "entry_price": 54.0,
+    "entry_prob": "0.4605"
   }
 ]
