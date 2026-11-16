@@ -1,5 +1,5 @@
 # ============================================================
-# T-INVEST - TRAINER ORCHESTRATOR (LONG ONLY)
+# T-INVEST - TRAINER ORCHESTRATOR (LONG & SHORT)
 # Path: t_invest/learn/t_invest_learn.py
 # ============================================================
 
@@ -11,7 +11,7 @@ from t_tech.invest.constants import INVEST_GRPC_API
 from t_tech.invest.schemas import CandleInterval
 from t_tech.invest.utils import now
 
-VERSION = "7.1-180-days"
+VERSION = "7.2-long-short-180d"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("t_invest.trainer")
 
@@ -21,7 +21,6 @@ MODEL_OUT_FILE = Path("t_invest/data/model/best_params.json")
 MODELS_SRC_DIR = Path("t_invest/learn/models")
 
 TOP_N_STOCKS = 5        
-# ИЗМЕНЕНО: Обучаемся на 180 днях (полгода) вместо 90
 HISTORY_DAYS = 180       
 
 MODEL_OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -77,7 +76,7 @@ def main():
     stocks.sort(key=lambda x: x.get("avg_daily_range_pct", 0), reverse=True)
     top_stocks = stocks[:TOP_N_STOCKS]
 
-    log.info(f"TOP-{TOP_N_STOCKS} for LONG: {[s['ticker'] for s in top_stocks]}")
+    log.info(f"TOP-{TOP_N_STOCKS} for training: {[s['ticker'] for s in top_stocks]}")
     dfs = []
     
     with Client(TOKEN, target=INVEST_GRPC_API) as client:
@@ -91,27 +90,42 @@ def main():
     full_df = pd.concat(dfs).sort_values('open_time').reset_index(drop=True) if dfs else pd.DataFrame()
     models = load_models()
     
-    out_data = {"trainer_version": VERSION, "updated_at": datetime.now(timezone.utc).isoformat(), "long_tickers": [s["ticker"] for s in top_stocks], "intraday": {"long": None}, "swing": {"long": None}}
+    # Инициализируем структуру для L и S
+    out_data = {
+        "trainer_version": VERSION, 
+        "updated_at": datetime.now(timezone.utc).isoformat(), 
+        "long_tickers": [s["ticker"] for s in top_stocks], 
+        "short_tickers": [s["ticker"] for s in top_stocks], # Шортим те же бумаги
+        "intraday": {"long": None, "short": None}, 
+        "swing": {"long": None, "short": None}
+    }
 
+    # ЦИКЛ ПО РЕЖИМАМ И СТОРОНАМ
     for mode in ["intraday", "swing"]:
-        log.info(f"--- Searching best model for {mode.upper()} / LONG ---")
-        best_score = -99999; best_model_data = None
+        for side in ["long", "short"]:
+            log.info(f"--- Searching best model for {mode.upper()} / {side.upper()} ---")
+            best_score = -99999; best_model_data = None
 
-        for model_name, module in models:
-            try:
-                res = module.train(full_df, side="long", mode=mode)
-                if res and res.get("metrics"):
-                    sc = res["metrics"].get("score", -99999)
-                    if sc > best_score:
-                        best_score = sc; res["source"] = model_name; best_model_data = res
-                        log.info(f"  🏆 New best: {model_name} (Score: {sc})")
-            except Exception as e: log.error(f"  ❌ Model {model_name} crashed: {e}")
-                
-        if best_model_data:
-            out_data[mode]["long"] = best_model_data
-            if "model_path" in best_model_data:
-                old_p = Path(best_model_data["model_path"]); new_p = MODEL_OUT_FILE.parent / f"best_{mode}_long.pkl"
-                if old_p.exists(): os.replace(old_p, new_p); best_model_data["model_path"] = str(new_p)
+            for model_name, module in models:
+                try:
+                    # Передаем side в модель (она должна сама перестроить таргеты)
+                    res = module.train(full_df, side=side, mode=mode)
+                    if res and res.get("metrics"):
+                        sc = res["metrics"].get("score", -99999)
+                        if sc > best_score:
+                            best_score = sc; res["source"] = model_name; best_model_data = res
+                            log.info(f"  🏆 New best: {model_name} (Score: {sc})")
+                except Exception as e: 
+                    log.error(f"  ❌ Model {model_name} crashed for {side}: {e}")
+                    
+            if best_model_data:
+                out_data[mode][side] = best_model_data
+                if "model_path" in best_model_data:
+                    old_p = Path(best_model_data["model_path"]); 
+                    new_p = MODEL_OUT_FILE.parent / f"best_{mode}_{side}.pkl"
+                    if old_p.exists(): 
+                        os.replace(old_p, new_p); 
+                        best_model_data["model_path"] = str(new_p)
 
     # Сохраняем статистику для отчета
     out_data["stats"] = {
@@ -119,7 +133,11 @@ def main():
         "elapsed_seconds": int(time.time() - start_time)
     }
 
-    for pkl in MODEL_OUT_FILE.parent.glob("model_*.pkl"): pkl.unlink()
+    # Чистим старые файлы
+    for pkl in MODEL_OUT_FILE.parent.glob("*.pkl"): 
+        if "best_" not in pkl.name:
+            pkl.unlink()
+            
     with open(MODEL_OUT_FILE, "w", encoding="utf-8") as f: json.dump(out_data, f, ensure_ascii=False, indent=2)
     
     log.info("Starting report script...")
