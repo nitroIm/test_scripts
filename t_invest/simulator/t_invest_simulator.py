@@ -1,7 +1,17 @@
 # ============================================================
 # T-INVEST - SIMULATOR (LONG/SHORT & ONLINE UPDATE & SWING MULTI-DAY)
-# Version: 8.1
+# Version: 8.1 (FIX 1)
 # Path: t_invest/simulator/t_invest_simulator.py
+#
+# ИЗМЕНЕНИЯ:
+#   - ФИКС фантомных закрытий: удаление позиции из стейта теперь
+#     происходит СРАЗУ после успешного ордера, а не в конце блока
+#     расчётов. Ошибка в учёте/TG больше не resurrect-ит позицию.
+#   - Если ордер закрытия не прошёл — позиция остаётся открытой
+#     (continue), попытка повторится на следующем прогоне.
+#   - ЛОГИ ВХОДА: каждый блокированный вход теперь виден в логах
+#     с причиной (лимит, кулдаун, баланс, новости, нет модели,
+#     дубликат свечи). Больше никаких немых continue.
 # ============================================================
 
 import os, sys, json, logging, joblib, requests, pickle
@@ -136,7 +146,7 @@ def get_stats_text(ticker, history, now_time):
 
 # --- ОСНОВНОЙ ЦИКЛ ---
 def main():
-    log.info("STARTING SIMULATOR v8.1 (LONG/SHORT & SWING MULTI-DAY)")
+    log.info("STARTING SIMULATOR v8.1 FIX1 (LONG/SHORT & SWING MULTI-DAY)")
     config = load_config()
 
     if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
@@ -164,6 +174,12 @@ def main():
     if "positions" not in state: state["positions"] = {}
     if "last_h1_candle" not in state: state["last_h1_candle"] = {}
     if "cooldown" not in state: state["cooldown"] = {}
+
+    # ДИАГНОСТИКА: сразу видно, что живёт в стейте на момент старта
+    if state["positions"]:
+        log.info(f"Открытые позиции в стейте: {', '.join(state['positions'].keys())}")
+    else:
+        log.info("Открытых позиций в стейте нет")
 
     history = []
     if HISTORY_FILE.exists():
@@ -222,6 +238,8 @@ def main():
                 state["deposit_v3"] = True; state["alert_sent_v3"] = False
             if rub_balance > 1000: state["alert_sent_v3"] = False
         except Exception as e: log.warning(f"Balance error: {e}")
+
+        log.info(f"Баланс песочницы: {rub_balance:.2f}₽, торговое время: {is_trading_hours}")
 
         # --- ЦИКЛ ПО ТИКЕРАМ ---
         for ticker in tickers:
@@ -286,11 +304,22 @@ def main():
 
                         # Закрытие позиции
                         if exit_reason:
+                            # ШАГ 1: ордер. Если не прошёл — позицию НЕ трогаем,
+                            # попытка повторится на следующем прогоне.
                             try:
-                                # Для лонга продаем, для шорта покупаем
                                 close_dir = OrderDirection.ORDER_DIRECTION_SELL if is_long else OrderDirection.ORDER_DIRECTION_BUY
                                 client.sandbox.post_sandbox_order(figi=figi, quantity=pos["qty"], direction=close_dir, account_id=acc_id, order_type=OrderType.ORDER_TYPE_MARKET)
+                            except Exception as e:
+                                log.error(f"Sell error {pos_key}: {e} — позиция остаётся открытой")
+                                continue
 
+                            # ШАГ 2: позиция реально закрыта — удаляем из стейта НЕМЕДЛЕННО.
+                            # Ни одна ошибка ниже не приведёт к фантомному повторному закрытию.
+                            state["positions"].pop(pos_key, None)
+                            log.info(f"Закрытие {pos_key}: {exit_reason}")
+
+                            # ШАГ 3: учёт и уведомления (ошибки здесь уже безопасны)
+                            try:
                                 entry_time = datetime.fromisoformat(pos.get("entry_time", now_time.isoformat()))
                                 duration_hours = round((now_time - entry_time).total_seconds() / 3600, 2)
 
@@ -347,27 +376,31 @@ def main():
                                     f"Время: {current_klg} КЛГ"
                                     f"{get_stats_text(ticker, history, now_time)}"
                                 )
-                                del state["positions"][pos_key]
                             except Exception as e:
-                                log.error(f"Sell error {pos_key}: {e}")
+                                log.error(f"Учёт закрытия {pos_key}: {e}")
 
                     # === ЛОГИКА ВХОДА (Только в торговые часы) ===
                     if pos_key not in state["positions"]:
                         # Если сейчас не торговое время, пропускаем открытие новых сделок
                         if not is_trading_hours: continue
-                        
-                        if mode == "intraday" and state["daily_trades"].get("intraday", 0) >= MAX_INTRADAY_TRADES: continue
-                        if mode == "swing" and state["daily_trades"].get("swing", 0) >= MAX_SWING_TRADES: continue
+
+                        if mode == "intraday" and state["daily_trades"].get("intraday", 0) >= MAX_INTRADAY_TRADES:
+                            log.info(f"{pos_key}: вход заблокирован — дневной лимит ({MAX_INTRADAY_TRADES}) исчерпан"); continue
+                        if mode == "swing" and state["daily_trades"].get("swing", 0) >= MAX_SWING_TRADES:
+                            log.info(f"{pos_key}: вход заблокирован — дневной лимит ({MAX_SWING_TRADES}) исчерпан"); continue
 
                         if pos_key in state["cooldown"]:
-                            if now_time < datetime.fromisoformat(state["cooldown"][pos_key]): continue
+                            if now_time < datetime.fromisoformat(state["cooldown"][pos_key]):
+                                log.info(f"{pos_key}: вход заблокирован — кулдаун после лосса"); continue
                             else: del state["cooldown"][pos_key]
 
                         model = models.get(f"{mode}_{side}")
                         signal = 0
                         prob = 0.0
 
-                        if model is not None:
+                        if model is None:
+                            log.warning(f"{pos_key}: вход заблокирован — модель не найдена")
+                        else:
                             try:
                                 X = last_candle[FEATURE_COLS].values.reshape(1, -1)
                                 if hasattr(model, "predict_proba"):
@@ -382,15 +415,21 @@ def main():
                                     prob = 1.0 if signal == 1 else 0.0
                             except Exception as e: log.error(f"Pred error {pos_key}: {e}")
 
+                        if signal != 1:
+                            log.info(f"{pos_key}: нет сигнала (prob={prob:.2f} < {mode_config['min_prob']:.2f})")
+
                         news_data = news_scores.get(ticker, {})
                         news_score = news_data.get("score", 0.0) if isinstance(news_data, dict) else 0.0
 
                         if signal == 1:
-                            if state["last_h1_candle"].get(pos_key) == last_candle_time: continue
-                            if news_score < mode_config["news_block"]: continue
+                            if state["last_h1_candle"].get(pos_key) == last_candle_time:
+                                log.info(f"{pos_key}: вход заблокирован — сигнал уже подавался на этой H1-свече"); continue
+                            if news_score < mode_config["news_block"]:
+                                log.info(f"{pos_key}: вход заблокирован — новостной фон ({news_score:.2f} < {mode_config['news_block']:.2f})"); continue
 
                             trade_cost = current_price * lot
                             if rub_balance < trade_cost:
+                                log.info(f"{pos_key}: вход заблокирован — не хватает денег (нужно {trade_cost:.2f}, есть {rub_balance:.2f})")
                                 if rub_balance < 100 and not state.get("alert_sent_v3", False):
                                     send_tg(f"⚠️ <b>ВНИМАНИЕ! ДЕНЬГИ ЗАКОНЧИЛИСЬ</b>\n\nБаланс: {rub_balance:.2f} ₽.")
                                     state["alert_sent_v3"] = True
@@ -441,7 +480,7 @@ def main():
     # Сохранение состояния
     with open(STATE_FILE, "w") as f: json.dump(state, f, indent=2, default=str)
     with open(HISTORY_FILE, "w") as f: json.dump(history, f, indent=2, default=str)
-    log.info("Simulator done.")
+    log.info(f"Simulator done. Позиций в стейте на выходе: {len(state['positions'])}")
 
 if __name__ == "__main__":
     main()
