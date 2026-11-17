@@ -1,94 +1,18 @@
 {
   "trainer_version": "7.3-online-custom-180d",
-  "updated_at": "2026-11-16T08:16:45.845097+00:00",
-  "long_tickers": [
-    "EUTR",
-    "SMLT",
-    "ETLN",
-    "MVID",
-    "LSRG"
-  ],
-  "short_tickers": [
-    "EUTR",
-    "SMLT",
-    "ETLN",
-    "MVID",
-    "LSRG"
-  ],
+  "updated_at": "2026-11-17T06:31:20.692275+00:00",
+  "long_tickers": [],
+  "short_tickers": [],
   "intraday": {
-    "long": {
-      "params": {
-        "tp_pct": 1.0,
-        "sl_pct": 0.5,
-        "time_exit_h": 8,
-        "model_type": "catboost"
-      },
-      "metrics": {
-        "trades": 395,
-        "pnl": -4.07,
-        "winrate": 0.4481,
-        "max_dd": -8.45,
-        "score": -0.48
-      },
-      "model_path": "t_invest/data/model/best_intraday_long.pkl",
-      "source": "model_catboost"
-    },
-    "short": {
-      "params": {
-        "tp_pct": 2.0,
-        "sl_pct": 1.0,
-        "time_exit_h": 12,
-        "model_type": "lgbm"
-      },
-      "metrics": {
-        "trades": 477,
-        "pnl": -2.1,
-        "winrate": 0.4633,
-        "max_dd": -12.22,
-        "score": -0.17
-      },
-      "model_path": "t_invest/data/model/best_intraday_short.pkl",
-      "source": "model_lgbm"
-    }
+    "long": null,
+    "short": null
   },
   "swing": {
-    "long": {
-      "params": {
-        "tp_pct": 8.0,
-        "sl_pct": 2.0,
-        "time_exit_h": 24,
-        "model_type": "logreg"
-      },
-      "metrics": {
-        "trades": 29,
-        "pnl": 3.8,
-        "winrate": 0.5862,
-        "max_dd": -1.92,
-        "score": 1.92
-      },
-      "model_path": "t_invest/data/model/best_swing_long.pkl",
-      "source": "model_logreg"
-    },
-    "short": {
-      "params": {
-        "tp_pct": 8.0,
-        "sl_pct": 3.0,
-        "time_exit_h": 72,
-        "model_type": "lgbm"
-      },
-      "metrics": {
-        "trades": 98,
-        "pnl": 6.22,
-        "winrate": 0.398,
-        "max_dd": -12.88,
-        "score": 0.48
-      },
-      "model_path": "t_invest/data/model/best_swing_short.pkl",
-      "source": "model_lgbm"
-    }
+    "long": null,
+    "short": null
   },
   "stats": {
-    "total_rows": 16456,
-    "elapsed_seconds": 53
+    "total_rows": 0,
+    "elapsed_seconds": 0
   }
 }
