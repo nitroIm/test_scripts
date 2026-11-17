@@ -1261,5 +1261,14 @@
     "entry_time": "2026-11-17T10:31:34.641989+00:00",
     "entry_price": 303.7,
     "entry_prob": 0.55
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-17T10:46:04.280141+00:00",
+    "entry_price": 54.55,
+    "entry_prob": 0.52
   }
 ]
