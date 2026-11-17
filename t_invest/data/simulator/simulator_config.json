@@ -1,10 +1,10 @@
 {
   "intraday": {
-    "min_prob": 0.53,
+    "min_prob": 0.55,
     "trail_mult": 1.5,
     "news_block": -0.5,
     "starvation_count": 0,
-    "last_crush_alert": 11
+    "last_crush_alert": 14
   },
   "swing": {
     "min_prob": 0.47,
