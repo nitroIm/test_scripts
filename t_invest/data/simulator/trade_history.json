@@ -1409,5 +1409,22 @@
     "entry_time": "2026-11-17T13:16:14.672153+00:00",
     "entry_price": 901.8,
     "entry_prob": 0.48
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-17T10:31:34.641989+00:00",
+    "entry_price": 910.4,
+    "entry_prob": 0.47,
+    "exit_time": "2026-11-17T13:31:34.785859+00:00",
+    "exit_price": 906.0,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 3.0,
+    "pnl_pct": 0.48,
+    "pnl_rub": 4.4,
+    "balance_after": 10024.11
   }
 ]
