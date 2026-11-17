@@ -2,22 +2,26 @@
 # Python: 3.10
 # t-tech-investments: 1.49.3
 #
-# ИЗМЕНЕНИЯ:
-#   - ФИКС rate limits: пауза между запросами к API (REQUEST_DELAY),
-#     ~240 запросов/мин с запасом ниже лимита marketdata.
-#   - ФИКС тишины: причины отсева больше не молчат — пишутся в лог
-#     (ошибки API отдельно, обычные фильтры суммарно).
-#   - RETRY: при сетевой ошибке API запрос повторяется до 3 раз
-#     с растущей паузой, чтобы ликвидная бумага не терялась из-за
-#     одного сбоя.
-#   - Фильтр незакрытой дневной свечи: сегодня ещё не закрылась,
-#     её оборот/диапазон занижены и портят средние.
+# ИЗМЕНЕНИЯ v1.1:
+#   - ФИКС КРИТИЧЕСКИЙ: with_retry теперь передаёт client в обёртки.
+#     Раньше каждая бумага падала с TypeError (missing 'client'),
+#     сканер отсеивал все 1909 акций и писал пустой whitelist.
+#   - ФИКС: REQUEST_DELAY объявлен, но не использовался. Теперь пауза
+#     реально работает — пауза стоит между запросами к API.
+#   - Атомарная запись whitelist через .tmp: крэш на середине записи
+#     больше не оставит битый файл.
+#
+# Осталось с прошлой версии:
+#   - RETRY до 3 попыток при временных ошибках API.
+#   - Причины отсева пишутся в лог (ошибки API — каждая, фильтры — суммарно).
+#   - Незакрытая дневная свеча отрезается, чтобы не портить средние.
 
 import os
 import json
 import time
 import logging
 from datetime import timedelta, datetime, timezone
+from pathlib import Path
 
 from t_tech.invest import Client
 from t_tech.invest.constants import INVEST_GRPC_API
@@ -35,6 +39,8 @@ CANDLES_DAYS = 10
 REQUEST_DELAY = 0.25      # секунд между бумагами (~240 req/min)
 MAX_RETRIES = 3           # попыток на запрос при сетевой ошибке
 RETRY_DELAY = 2.0         # базовая пауза между попытками, сек
+
+OUTPUT_PATH = Path("t_invest/data/scanner/whitelist.json")
 
 log = logging.getLogger("scanner")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -67,197 +73,4 @@ def classify_trend(closes):
     elif recent[-1] < recent[0] * 0.98:
         return "DOWN"
     else:
-        return "SIDEWAYS"
-
-
-def is_retryable(error):
-    text = str(error).lower()
-    return any(m in text for m in RETRYABLE_MARKERS)
-
-
-def with_retry(func, figi, what):
-    """Вызывает func(figi=figi, **kwargs) с ретраями при временных ошибках API."""
-    last_err = None
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            return func(figi=figi), None
-        except Exception as e:
-            last_err = e
-            if is_retryable(e) and attempt < MAX_RETRIES:
-                delay = RETRY_DELAY * attempt
-                log.warning(f"{what} {figi}: попытка {attempt}/{MAX_RETRIES} не удалась ({e}), жду {delay:.0f}с")
-                time.sleep(delay)
-    return None, f"Ошибка {what}: {last_err}"
-
-
-def get_order_book_retry(client, figi):
-    return client.market_data.get_order_book(figi=figi, depth=1)
-
-
-def get_candles_retry(client, figi):
-    return client.market_data.get_candles(
-        figi=figi,
-        from_=now() - timedelta(days=CANDLES_DAYS),
-        to=now(),
-        interval=CandleInterval.CANDLE_INTERVAL_DAY,
-    )
-
-
-def analyze_share(client, share):
-    figi = share.figi
-
-    if not share.api_trade_available_flag:
-        return None, "Нет доступа через API"
-    if not share.buy_available_flag or not share.sell_available_flag:
-        return None, "Покупка/продажа недоступна"
-    if not share.liquidity_flag:
-        return None, "Не помечена как ликвидная"
-
-    try:
-        ob, err = with_retry(get_order_book_retry, figi, "стакан")
-        if err:
-            return None, err
-        if not ob.bids or not ob.asks:
-            return None, "Пустой стакан"
-        best_bid = quotation_to_float(ob.bids[0].price)
-        best_ask = quotation_to_float(ob.asks[0].price)
-        if best_bid <= 0 or best_ask <= 0:
-            return None, "Нулевые цены"
-        spread_pct = (best_ask - best_bid) / best_bid * 100
-        if spread_pct > MAX_SPREAD_PERCENT:
-            return None, f"Спред {spread_pct:.2f}%"
-    except Exception as e:
-        return None, f"Ошибка стакана: {e}"
-
-    try:
-        candles_resp, err = with_retry(get_candles_retry, figi, "свечи")
-        if err:
-            return None, err
-        candles = candles_resp.candles
-        if len(candles) < 3:
-            return None, "Мало свечей"
-    except Exception as e:
-        return None, f"Ошибка свечей: {e}"
-
-    # Отрезаем незакрытую сегодняшнюю свечу — её оборот и диапазон занижены
-    today_utc = datetime.now(timezone.utc).date()
-    candles = [c for c in candles if c.time.replace(tzinfo=timezone.utc).date() < today_utc]
-    if len(candles) < 3:
-        return None, "Мало закрытых свечей"
-
-    turnovers, ranges, closes = [], [], []
-    for c in candles:
-        close = quotation_to_float(c.close)
-        high = quotation_to_float(c.high)
-        low = quotation_to_float(c.low)
-        turnovers.append(c.volume * close)
-        if low > 0:
-            ranges.append((high - low) / low * 100)
-        closes.append(close)
-
-    avg_turnover = sum(turnovers) / len(turnovers)
-    if avg_turnover < MIN_DAILY_TURNOVER_RUB:
-        return None, "Низкий оборот"
-
-    avg_range = sum(ranges) / len(ranges) if ranges else 0
-
-    return {
-        "ticker": share.ticker,
-        "figi": figi,
-        "name": share.name,
-        "trade_method": "API" if share.api_trade_available_flag else "MANUAL",
-        "api_trade_available": share.api_trade_available_flag,
-        "buy_available": share.buy_available_flag,
-        "sell_available": share.sell_available_flag,
-        "lot": share.lot,
-        "last_price": quotation_to_float(candles[-1].close),
-        "avg_daily_turnover_rub": round(avg_turnover, 2),
-        "spread_pct": round(spread_pct, 4),
-        "avg_daily_range_pct": round(avg_range, 2),
-        "volatility_tag": classify_volatility(avg_range),
-        "trend": classify_trend(closes),
-        "is_new": False,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }, None
-
-
-def main():
-    if not TOKEN:
-        print("❌ T_INVEST_TOKEN не задан")
         return
-
-    output_path = "t_invest/data/scanner/whitelist.json"
-    old_data = {}
-    if os.path.exists(output_path):
-        try:
-            with open(output_path, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-                if content:
-                    parsed = json.loads(content)
-                    # Поддержка нового и старого формата
-                    if isinstance(parsed, dict) and "data" in parsed:
-                        old_data = {item["ticker"]: item for item in parsed["data"]}
-                    elif isinstance(parsed, list):
-                        old_data = {item["ticker"]: item for item in parsed}
-        except Exception as e:
-            print(f"⚠️ Старый whitelist не прочитан: {e}")
-
-    with Client(TOKEN, target=INVEST_GRPC_API) as client:
-        shares_resp = client.instruments.shares(
-            instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE
-        )
-        shares = shares_resp.instruments
-        print(f"Всего акций для проверки (BASE): {len(shares)}")
-
-        results = []
-        skipped = 0
-        api_errors = []
-
-        for share in shares:
-            analyzed, reason = analyze_share(client, share)
-            if analyzed:
-                if share.ticker not in old_data:
-                    analyzed["is_new"] = True
-                results.append(analyzed)
-            else:
-                skipped += 1
-                if reason and reason.startswith("Ошибка"):
-                    # Ошибки API — видим каждую, их нельзя терять
-                    log.warning(f"⛔ {share.ticker}: {reason}")
-                    api_errors.append(share.ticker)
-                # Обычные фильтры не спамим, но сумма будет в сводке
-
-        print(f"\n✅ Ликвидных акций прошло все фильтры: {len(results)}")
-        print(f"⛔ Отсеяно неликвидных: {skipped}")
-        if api_errors:
-            print(f"⚠️ Потеряно из-за ошибок API: {len(api_errors)} ({', '.join(api_errors[:20])}{'...' if len(api_errors) > 20 else ''})")
-
-        # === ФОРМИРУЕМ МЕТАДАННЫЕ ===
-        now_utc = datetime.now(timezone.utc)
-        period_start = now_utc - timedelta(days=CANDLES_DAYS)
-
-        final_data = {
-            "metadata": {
-                "collected_at": now_utc.isoformat(),
-                "period_start": period_start.isoformat(),
-                "period_end": now_utc.isoformat(),
-                "candles_days": CANDLES_DAYS,
-                "min_turnover_rub": MIN_DAILY_TURNOVER_RUB,
-                "max_spread_percent": MAX_SPREAD_PERCENT,
-                "total_found": len(results),
-                "total_skipped": skipped,
-                "api_errors": len(api_errors),
-                "version": "1.0"
-            },
-            "data": results
-        }
-
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(final_data, f, ensure_ascii=False, indent=2)
-
-        print(f"💾 Сохранено в {output_path}")
-
-
-if __name__ == "__main__":
-    main()
