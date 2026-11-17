@@ -1226,5 +1226,40 @@
     "entry_time": "2026-11-17T10:16:19.816672+00:00",
     "entry_price": 23.34,
     "entry_prob": 0.4568
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "long",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-17T09:01:37.632087+00:00",
+    "entry_price": 897.4,
+    "entry_prob": 0.7200575397907731,
+    "exit_time": "2026-11-17T10:31:34.641989+00:00",
+    "exit_price": 910.4,
+    "reason": "TAKE_PROFIT",
+    "duration_hours": 1.5,
+    "pnl_pct": 1.45,
+    "pnl_rub": 13.0,
+    "balance_after": 9636.53
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-17T10:31:34.641989+00:00",
+    "entry_price": 910.4,
+    "entry_prob": 0.47
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-17T10:31:34.641989+00:00",
+    "entry_price": 303.7,
+    "entry_prob": 0.55
   }
 ]
