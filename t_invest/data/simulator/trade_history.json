@@ -1296,5 +1296,22 @@
     "pnl_pct": -0.56,
     "pnl_rub": -1.7,
     "balance_after": 10296.9
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-17T10:01:33.093951+00:00",
+    "entry_price": 23.4,
+    "entry_prob": 0.53,
+    "exit_time": "2026-11-17T11:31:28.684040+00:00",
+    "exit_price": 23.52,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 1.5,
+    "pnl_pct": -0.51,
+    "pnl_rub": -0.12,
+    "balance_after": 9711.37
   }
 ]
