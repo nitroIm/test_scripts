@@ -1104,5 +1104,49 @@
     "entry_time": "2026-11-17T08:46:09.341470+00:00",
     "entry_price": 54.35,
     "entry_prob": 0.5096
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-17T09:01:37.632087+00:00",
+    "entry_price": 301.3,
+    "entry_prob": 0.4517
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "long",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-17T08:01:32.351844+00:00",
+    "entry_price": 23.4,
+    "entry_prob": 0.46885539743283333,
+    "exit_time": "2026-11-17T09:01:37.632087+00:00",
+    "exit_price": 23.28,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 1.0,
+    "pnl_pct": -0.51,
+    "pnl_rub": -0.12,
+    "balance_after": 9322.26
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-17T09:01:37.632087+00:00",
+    "entry_price": 897.4,
+    "entry_prob": 0.7201
+  },
+  {
+    "ticker": "MVID",
+    "mode": "swing",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-17T09:01:37.632087+00:00",
+    "entry_price": 54.5,
+    "entry_prob": 0.49
   }
 ]
