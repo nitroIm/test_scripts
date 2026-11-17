@@ -1478,5 +1478,14 @@
     "entry_time": "2026-11-17T15:01:50.821941+00:00",
     "entry_price": 54.9,
     "entry_prob": 0.58
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-17T15:16:18.700066+00:00",
+    "entry_price": 906.2,
+    "entry_prob": 0.56
   }
 ]
