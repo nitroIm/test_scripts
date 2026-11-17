@@ -1095,5 +1095,14 @@
     "pnl_pct": -0.87,
     "pnl_rub": -7.8,
     "balance_after": 9655.15
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-17T08:46:09.341470+00:00",
+    "entry_price": 54.35,
+    "entry_prob": 0.5096
   }
 ]
