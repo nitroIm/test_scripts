@@ -10,6 +10,6 @@
     "trail_mult": 1.0,
     "news_block": -0.5,
     "starvation_count": 0,
-    "last_loss_alert": 4
+    "last_loss_alert": 0
   }
 }
