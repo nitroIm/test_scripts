@@ -1322,5 +1322,23 @@
     "entry_time": "2026-11-17T11:46:08.317378+00:00",
     "entry_price": 305.1,
     "entry_prob": 0.56
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-17T12:01:34.461978+00:00",
+    "entry_price": 23.46,
+    "entry_prob": 0.65
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "swing",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-17T12:01:34.461978+00:00",
+    "entry_price": 23.46,
+    "entry_prob": 0.51
   }
 ]
