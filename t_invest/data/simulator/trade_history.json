@@ -1426,5 +1426,48 @@
     "pnl_pct": 0.48,
     "pnl_rub": 4.4,
     "balance_after": 10024.11
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-17T14:16:26.901441+00:00",
+    "entry_price": 23.62,
+    "entry_prob": 0.61
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "side": "long",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-17T08:46:09.341470+00:00",
+    "entry_price": 54.35,
+    "entry_prob": 0.5095718432613889,
+    "exit_time": "2026-11-17T14:16:26.901441+00:00",
+    "exit_price": 55.0,
+    "reason": "TAKE_PROFIT",
+    "duration_hours": 5.5,
+    "pnl_pct": 1.2,
+    "pnl_rub": 0.65,
+    "balance_after": 8233.63
+  },
+  {
+    "ticker": "MVID",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-17T10:46:04.280141+00:00",
+    "entry_price": 54.55,
+    "entry_prob": 0.52,
+    "exit_time": "2026-11-17T14:16:26.901441+00:00",
+    "exit_price": 55.0,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 3.51,
+    "pnl_pct": -0.82,
+    "pnl_rub": -0.45,
+    "balance_after": 8287.73
   }
 ]
