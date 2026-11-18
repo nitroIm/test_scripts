@@ -1581,5 +1581,14 @@
     "pnl_pct": 0.98,
     "pnl_rub": 3.0,
     "balance_after": 11083.02
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-18T07:46:10.915796+00:00",
+    "entry_price": 896.8,
+    "entry_prob": 0.6506
   }
 ]
