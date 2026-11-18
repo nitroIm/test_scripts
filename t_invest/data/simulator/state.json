@@ -167,9 +167,9 @@
       },
       "tp": 279.49600000000004,
       "sl": 312.91400000000004,
-      "trailing_stop": 309.103,
+      "trailing_stop": 308.79400000000004,
       "highest": 303.8,
-      "lowest": 300.1,
+      "lowest": 299.8,
       "exit_time": "2026-11-20T10:01:33.093951+00:00",
       "figi": "BBG00F6NKQX3"
     },
@@ -239,8 +239,8 @@
       },
       "tp": 973.944,
       "sl": 874.746,
-      "trailing_stop": 874.746,
-      "highest": 910.6,
+      "trailing_stop": 883.67,
+      "highest": 911.0,
       "lowest": 901.8,
       "exit_time": "2026-11-19T13:16:14.672153+00:00",
       "figi": "BBG004S68C39"
@@ -311,8 +311,8 @@
       },
       "tp": 914.736,
       "sl": 887.832,
-      "trailing_stop": 894.38,
-      "highest": 908.0,
+      "trailing_stop": 897.335,
+      "highest": 911.0,
       "lowest": 896.8,
       "exit_time": "2026-11-18T19:46:10.915796+00:00",
       "figi": "BBG004S68C39"
