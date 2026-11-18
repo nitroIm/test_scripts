@@ -1,5 +1,12 @@
 # PROD CONTOUR ONLY
 # Python: 3.10
+#
+# ИЗМЕНЕНИЯ v1.1:
+#   - Исправлено имя файла словаря: sentiment_dictionary.json
+#     (совпадает с реальным файлом в t_invest/data/news/).
+#   - Отбор новостей по собственному словарю: слова, бустеры, глушители.
+#   - Ярлыков ("Сильный позитив") в посте больше нет.
+#   - Файл t_invest_news_scores.json не читается и не нужен.
 
 import os
 import sys
@@ -12,19 +19,26 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("INVEST_BOT_TOKEN")
-# ИСПРАВЛЕНИЕ: Теперь читаем переменную канала
-CHAT_ID = os.environ.get("TG_T_INVEST_CHANNEL") 
+CHAT_ID = os.environ.get("TG_T_INVEST_CHANNEL")
 
-NEWS_SCORES_FILE = "t_invest/data/news/t_invest_news_scores.json"
+SENTIMENT_DICT_FILE = "t_invest/data/news/sentiment_dictionary.json"
 NEWS_COLLECTOR_FILE = "t_invest/data/news/t_invest_news_collector.json"
 WHITELIST_FILE = "t_invest/data/scanner/whitelist.json"
+
+# Сколько "баллов" словаря нужно, чтобы новость попала в пост.
+# 1.0 = одна сильная новость или пара средних. Хотите реже — поднимите до 1.5.
+SCORE_THRESHOLD = 1.0
+
+MAX_STOCK_NEWS = 5
+MAX_MACRO_NEWS = 2
 
 KLG_TZ = timezone(timedelta(hours=2))
 
 STOP_WORDS = ["итоги торгов", "анонс", "обзор", "краткий обзор", "лидеры роста", "лидеры падения"]
 
+
 def send_telegram_message(text):
-    if not TOKEN or not CHAT_ID: 
+    if not TOKEN or not CHAT_ID:
         log.error(f"Нет TG токена или ID (TOKEN: {bool(TOKEN)}, CHAT_ID: {bool(CHAT_ID)})")
         return False
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -39,41 +53,65 @@ def send_telegram_message(text):
         log.error(f"TG Send Error: {e}")
         return False
 
-def get_score_text(score):
-    if score >= 0.7: return "🟢 Сильный позитив"
-    if score > 0: return "🟢 Позитив"
-    if score <= -0.7: return "🔴 Сильный негатив"
-    return "🔴 Негатив"
 
 def is_trash(title):
     title_lower = title.lower()
     return any(word in title_lower for word in STOP_WORDS)
 
+
+def load_dictionary():
+    with open(SENTIMENT_DICT_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def score_text(text, sentiment):
+    """Считает балл новости по словарю: слова + бустеры + глушители."""
+    text_lower = text.lower()
+    matched = 0
+    multiplier = 1.0
+
+    for word, weight in sentiment.get("words", {}).items():
+        if word.lower() in text_lower:
+            matched += weight
+
+    for word, factor in sentiment.get("boosters", {}).items():
+        if word.lower() in text_lower:
+            multiplier *= factor
+
+    for word, factor in sentiment.get("dampeners", {}).items():
+        if word.lower() in text_lower:
+            multiplier *= factor
+
+    return matched * multiplier
+
+
 def get_news_title(ticker, news_list):
     sorted_news = sorted(news_list, key=lambda x: x.get('ts', ''), reverse=True)
-    
+
     for news in sorted_news:
         tickers = news.get('tickers', [])
         title = news.get('title', '')
-        
-        if not title or is_trash(title): continue
-        if len(tickers) > 5: continue 
+
+        if not title or is_trash(title):
+            continue
 
         if ticker == "_MARKET_":
-            if len(tickers) > 5 and not is_trash(title):
+            if len(tickers) > 5:
                 return title
         else:
             if ticker in tickers and len(tickers) <= 3:
                 return title
     return ""
 
-def main():
-    if not os.path.exists(NEWS_SCORES_FILE) or not os.path.exists(NEWS_COLLECTOR_FILE) or not os.path.exists(WHITELIST_FILE):
-        log.error("Один из файлов не найден")
-        sys.exit(1)
 
-    with open(NEWS_SCORES_FILE, "r", encoding="utf-8") as f:
-        scores_data = json.load(f)
+def main():
+    for path in (SENTIMENT_DICT_FILE, NEWS_COLLECTOR_FILE, WHITELIST_FILE):
+        if not os.path.exists(path):
+            log.error(f"Файл не найден: {path}")
+            sys.exit(1)
+
+    sentiment = load_dictionary()
+
     with open(NEWS_COLLECTOR_FILE, "r", encoding="utf-8") as f:
         news_data = json.load(f)
     with open(WHITELIST_FILE, "r", encoding="utf-8") as f:
@@ -82,23 +120,34 @@ def main():
     valid_tickers = {s["ticker"] for s in wl_data.get("data", [])}
 
     macro_news = []
-    stock_news = []
+    best_by_ticker = {}
 
-    for ticker, info in scores_data.items():
-        if not isinstance(info, dict): continue
-        score = info.get("score", 0.0)
-        
-        if abs(score) < 0.15: continue 
+    for news in news_data:
+        tickers = news.get('tickers', [])
+        title = news.get('title', '')
 
-        if ticker == "_MARKET_":
-            title = get_news_title("_MARKET_", news_data)
-            if title: macro_news.append({"ticker": "Рынок", "score": score, "title": title})
-        elif ticker in valid_tickers:
-            title = get_news_title(ticker, news_data)
-            if title: stock_news.append({"ticker": ticker, "score": score, "title": title})
+        if not title or is_trash(title):
+            continue
 
-    macro_news = sorted(macro_news, key=lambda x: abs(x['score']), reverse=True)[:2]
-    stock_news = sorted(stock_news, key=lambda x: abs(x['score']), reverse=True)[:5]
+        score = score_text(title, sentiment)
+        if abs(score) < SCORE_THRESHOLD:
+            continue
+
+        if len(tickers) > 5:
+            macro_news.append({"ticker": "Рынок", "score": score, "title": title})
+            continue
+
+        for ticker in tickers:
+            if ticker not in valid_tickers:
+                continue
+            if ticker not in best_by_ticker or abs(score) > abs(best_by_ticker[ticker]["score"]):
+                best_by_ticker[ticker] = {"ticker": ticker, "score": score, "title": title}
+
+    stock_news = sorted(best_by_ticker.values(), key=lambda x: abs(x['score']), reverse=True)
+    macro_news = sorted(macro_news, key=lambda x: abs(x['score']), reverse=True)
+
+    stock_news = stock_news[:MAX_STOCK_NEWS]
+    macro_news = macro_news[:MAX_MACRO_NEWS]
 
     if not macro_news and not stock_news:
         log.info("Нет подходящих новостей. Пост не отправлен.")
@@ -116,8 +165,7 @@ def main():
     if stock_news:
         text += "🎯 <b>По акциям:</b>\n"
         for n in stock_news:
-            score_label = get_score_text(n['score'])
-            text += f"• <b>{n['ticker']}</b> — {n['title']}\n<i>{score_label}</i>\n"
+            text += f"• <b>{n['ticker']}</b> — {n['title']}\n"
         text += "\n"
 
     text += "⚠️ <i>Не ИИР. Торговля — риск.</i>"
@@ -127,6 +175,7 @@ def main():
     else:
         log.error("Ошибка отправки в Telegram.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
