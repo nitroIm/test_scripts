@@ -1625,5 +1625,22 @@
     "pnl_pct": -0.51,
     "pnl_rub": -4.6,
     "balance_after": 9389.38
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "long",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-18T07:46:10.915796+00:00",
+    "entry_price": 896.8,
+    "entry_prob": 0.6506130109986282,
+    "exit_time": "2026-11-18T12:46:12.777517+00:00",
+    "exit_price": 914.8,
+    "reason": "TAKE_PROFIT",
+    "duration_hours": 5.0,
+    "pnl_pct": 2.01,
+    "pnl_rub": 18.0,
+    "balance_after": 8487.73
   }
 ]
