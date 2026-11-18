@@ -1660,5 +1660,14 @@
     "entry_time": "2026-11-18T13:01:41.475705+00:00",
     "entry_price": 912.4,
     "entry_prob": 0.617
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "swing",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-18T14:01:48.903608+00:00",
+    "entry_price": 299.1,
+    "entry_prob": 0.47
   }
 ]
