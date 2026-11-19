@@ -1772,5 +1772,31 @@
     "entry_time": "2026-11-19T08:31:19.625610+00:00",
     "entry_price": 22.42,
     "entry_prob": 0.55
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-19T08:46:12.370092+00:00",
+    "entry_price": 913.0,
+    "entry_prob": 0.5575
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "swing",
+    "side": "long",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-18T14:01:48.903608+00:00",
+    "entry_price": 299.1,
+    "entry_prob": 0.47,
+    "exit_time": "2026-11-19T08:46:12.370092+00:00",
+    "exit_price": 289.6,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 18.74,
+    "pnl_pct": -3.18,
+    "pnl_rub": -9.5,
+    "balance_after": 8855.32
   }
 ]
