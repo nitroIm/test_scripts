@@ -5,7 +5,7 @@
     "news_block": -0.5,
     "starvation_count": 0,
     "last_crush_alert": 0,
-    "last_loss_alert": 3
+    "last_loss_alert": 0
   },
   "swing": {
     "min_prob": 0.47,
