@@ -1,13 +1,13 @@
 # ============================================================
-# T-INVEST - SIMULATOR (LONG/SHORT & ONLINE UPDATE & NO LIMITS)
-# Version: 8.2
+# T-INVEST - SIMULATOR (LONG/SHORT & SEPARATE MODES)
+# Version: 8.4
 # Path: t_invest/simulator/t_invest_simulator.py
 #
 # ИЗМЕНЕНИЯ:
-#   - УДАЛЕНЫ дневные лимиты на сделки (MAX_INTRADAY_TRADES и т.д.).
-#     Теперь частоту торговли регулирует исключительно Аудит 
-#     через порог вероятности (min_prob).
-#   - Сохранены фиксы фантомных закрытий и детальные логи входов.
+#   - Разрешено одновременное открытие Intraday и Swing по одному тикеру.
+#   - Убран глобальный 1-часовой бан на тикер.
+#   - Оставлен кулдаун на 30 мин / 1 час ТОЛЬКО после закрытия по убытку.
+#   - Капитал (rub_balance) - единый для всех сделок (уже было).
 # ============================================================
 
 import os, sys, json, logging, joblib, requests, pickle
@@ -140,7 +140,7 @@ def get_stats_text(ticker, history, now_time):
 
 # --- ОСНОВНОЙ ЦИКЛ ---
 def main():
-    log.info("STARTING SIMULATOR v8.2 (NO LIMITS, LONG/SHORT, ONLINE UPDATE)")
+    log.info("STARTING SIMULATOR v8.4 (SEPARATE MODES)")
     config = load_config()
 
     if not BEST_PARAMS_FILE.exists() or not WHITELIST_FILE.exists():
@@ -223,7 +223,7 @@ def main():
             if rub_balance > 1000: state["alert_sent_v3"] = False
         except Exception as e: log.warning(f"Balance error: {e}")
 
-        log.info(f"Баланс песочницы: {rub_balance:.2f}₽, торговое время: {is_trading_hours}")
+        log.info(f"Баланс песочницы (ЕДИНЫЙ): {rub_balance:.2f}₽, торговое время: {is_trading_hours}")
 
         for ticker in tickers:
             figi = figi_map.get(ticker)
@@ -348,7 +348,7 @@ def main():
                             except Exception as e:
                                 log.error(f"Учёт закрытия {pos_key}: {e}")
 
-                    # === ЛОГИКА ВХОДА (БЕЗ ЛИМИТОВ) ===
+                    # === ЛОГИКА ВХОДА ===
                     if pos_key not in state["positions"]:
                         if not is_trading_hours: continue
 
