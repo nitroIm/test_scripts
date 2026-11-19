@@ -1816,5 +1816,31 @@
     "entry_time": "2026-11-19T09:46:14.347548+00:00",
     "entry_price": 290.1,
     "entry_prob": 0.5726
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "long",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-19T09:46:14.347548+00:00",
+    "entry_price": 290.1,
+    "entry_prob": 0.5725679212166523,
+    "exit_time": "2026-11-19T10:31:19.437159+00:00",
+    "exit_price": 288.1,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.75,
+    "pnl_pct": -0.69,
+    "pnl_rub": -2.0,
+    "balance_after": 9771.32
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "swing",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-19T10:31:19.437159+00:00",
+    "entry_price": 22.26,
+    "entry_prob": 0.4881
   }
 ]
