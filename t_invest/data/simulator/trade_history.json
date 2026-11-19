@@ -2014,5 +2014,14 @@
     "entry_time": "2026-11-19T13:46:28.373488+00:00",
     "entry_price": 279.4,
     "entry_prob": 0.58
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "swing",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-19T14:16:27.287247+00:00",
+    "entry_price": 916.2,
+    "entry_prob": 0.56
   }
 ]
