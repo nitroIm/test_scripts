@@ -2023,5 +2023,49 @@
     "entry_time": "2026-11-19T14:16:27.287247+00:00",
     "entry_price": 916.2,
     "entry_prob": 0.56
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "intraday",
+    "side": "long",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-19T08:46:12.370092+00:00",
+    "entry_price": 913.0,
+    "entry_prob": 0.5574705595013091,
+    "exit_time": "2026-11-19T14:31:32.964922+00:00",
+    "exit_price": 904.6,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 5.76,
+    "pnl_pct": -0.92,
+    "pnl_rub": -8.4,
+    "balance_after": 11830.59
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "swing",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-19T14:31:32.964922+00:00",
+    "entry_price": 904.6,
+    "entry_prob": 0.6877
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-19T14:31:32.964922+00:00",
+    "entry_price": 21.5,
+    "entry_prob": 0.7178
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "swing",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-19T14:31:32.964922+00:00",
+    "entry_price": 21.5,
+    "entry_prob": 0.5925
   }
 ]
