@@ -2273,5 +2273,14 @@
     "pnl_pct": 0.0,
     "pnl_rub": 0.0,
     "balance_after": 9628.86
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-20T11:01:41.272208+00:00",
+    "entry_price": 264.0,
+    "entry_prob": 0.704
   }
 ]
