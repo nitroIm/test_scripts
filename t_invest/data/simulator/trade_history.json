@@ -2195,5 +2195,31 @@
     "pnl_pct": 1.83,
     "pnl_rub": 5.1,
     "balance_after": 13074.62
+  },
+  {
+    "ticker": "LSRG",
+    "mode": "swing",
+    "side": "long",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-19T14:31:32.964922+00:00",
+    "entry_price": 904.6,
+    "entry_prob": 0.6876716893722664,
+    "exit_time": "2026-11-20T07:46:14.583531+00:00",
+    "exit_price": 920.2,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 17.24,
+    "pnl_pct": 1.72,
+    "pnl_rub": 15.6,
+    "balance_after": 9650.47
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-20T07:46:14.583531+00:00",
+    "entry_price": 20.8,
+    "entry_prob": 0.6245
   }
 ]
