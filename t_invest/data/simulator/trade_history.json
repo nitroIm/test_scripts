@@ -2230,5 +2230,22 @@
     "entry_time": "2026-11-20T08:01:34.558900+00:00",
     "entry_price": 20.72,
     "entry_prob": 0.66
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "long",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-20T07:46:14.583531+00:00",
+    "entry_price": 20.8,
+    "entry_prob": 0.6245105599094503,
+    "exit_time": "2026-11-20T08:31:23.494307+00:00",
+    "exit_price": 20.68,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.75,
+    "pnl_pct": -0.58,
+    "pnl_rub": -0.12,
+    "balance_after": 9628.94
   }
 ]
