@@ -95,9 +95,9 @@
       },
       "tp": 256.68,
       "sl": 284.58,
-      "trailing_stop": 272.544,
+      "trailing_stop": 271.422,
       "highest": 279.0,
-      "lowest": 267.2,
+      "lowest": 266.1,
       "exit_time": "2026-11-20T13:31:26.203768+00:00",
       "figi": "BBG00F6NKQX3"
     },
@@ -170,8 +170,7 @@
   "cooldown": {
     "EUTR_swing": "2026-11-16T08:01:29.864634+00:00",
     "MVID_swing": "2026-11-16T08:01:29.864634+00:00",
-    "ETLN_swing": "2026-11-16T08:01:29.864634+00:00",
-    "ETLN_intraday_long": "2026-11-20T09:01:23.494307+00:00"
+    "ETLN_swing": "2026-11-16T08:01:29.864634+00:00"
   },
   "deposit_v3": true,
   "alert_sent_v3": false,
