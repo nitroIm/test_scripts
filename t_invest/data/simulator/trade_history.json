@@ -2342,5 +2342,14 @@
     "pnl_pct": -3.09,
     "pnl_rub": -0.64,
     "balance_after": 9647.92
+  },
+  {
+    "ticker": "ETLN",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-20T14:31:30.472363+00:00",
+    "entry_price": 20.28,
+    "entry_prob": 0.7535
   }
 ]
