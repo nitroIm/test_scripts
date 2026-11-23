@@ -2360,5 +2360,22 @@
     "entry_time": "2026-11-20T14:46:18.158444+00:00",
     "entry_price": 20.26,
     "entry_prob": 0.59
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "swing",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-20T11:31:18.645354+00:00",
+    "entry_price": 267.7,
+    "entry_prob": "0.5170031",
+    "exit_time": "2026-11-23T07:01:44.121151+00:00",
+    "exit_price": 270.1,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 67.51,
+    "pnl_pct": -0.9,
+    "pnl_rub": -2.4,
+    "balance_after": 9872.55
   }
 ]
