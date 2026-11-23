@@ -2465,5 +2465,22 @@
     "entry_time": "2026-11-23T13:01:38.578245+00:00",
     "entry_price": 287.0,
     "entry_prob": 0.75
+  },
+  {
+    "ticker": "BELU",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-23T13:01:38.578245+00:00",
+    "entry_price": 287.0,
+    "entry_prob": 0.75,
+    "exit_time": "2026-11-23T13:46:22.337941+00:00",
+    "exit_price": 290.4,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 0.75,
+    "pnl_pct": -1.18,
+    "pnl_rub": -3.4,
+    "balance_after": 9827.27
   }
 ]
