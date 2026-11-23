@@ -204,7 +204,7 @@
       "tp": 282.54,
       "sl": 274.23,
       "trailing_stop": 274.23,
-      "highest": 278.6,
+      "highest": 279.0,
       "lowest": 277.0,
       "exit_time": "2026-11-23T20:31:37.993596+00:00",
       "figi": "BBG000TY1CD1"
@@ -241,7 +241,7 @@
       "sl": 472.2035,
       "trailing_stop": 472.2035,
       "highest": 458.45,
-      "lowest": 457.35,
+      "lowest": 455.2,
       "exit_time": "2026-11-26T08:46:08.477517+00:00",
       "figi": "TCS30A108JF7"
     },
