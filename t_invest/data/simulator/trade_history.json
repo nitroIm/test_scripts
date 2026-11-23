@@ -2482,5 +2482,22 @@
     "pnl_pct": -1.18,
     "pnl_rub": -3.4,
     "balance_after": 9827.27
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "long",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-23T09:01:37.047922+00:00",
+    "entry_price": 267.2,
+    "entry_prob": 0.6661195725107973,
+    "exit_time": "2026-11-23T14:16:23.973005+00:00",
+    "exit_price": 273.7,
+    "reason": "TAKE_PROFIT",
+    "duration_hours": 5.25,
+    "pnl_pct": 2.43,
+    "pnl_rub": 6.5,
+    "balance_after": 9526.62
   }
 ]
