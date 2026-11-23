@@ -2456,5 +2456,14 @@
     "pnl_pct": -3.33,
     "pnl_rub": -9.2,
     "balance_after": 9809.55
+  },
+  {
+    "ticker": "BELU",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-23T13:01:38.578245+00:00",
+    "entry_price": 287.0,
+    "entry_prob": 0.75
   }
 ]
