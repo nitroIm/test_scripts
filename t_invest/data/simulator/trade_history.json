@@ -2499,5 +2499,23 @@
     "pnl_pct": 2.43,
     "pnl_rub": 6.5,
     "balance_after": 9526.62
+  },
+  {
+    "ticker": "PRMD",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-23T15:16:24.759496+00:00",
+    "entry_price": 458.6,
+    "entry_prob": 0.67
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-23T15:16:24.759496+00:00",
+    "entry_price": 282.1,
+    "entry_prob": 0.7224
   }
 ]
