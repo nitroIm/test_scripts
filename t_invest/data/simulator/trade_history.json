@@ -2439,5 +2439,22 @@
     "pnl_pct": 2.31,
     "pnl_rub": 6.4,
     "balance_after": 9543.09
+  },
+  {
+    "ticker": "BELU",
+    "mode": "swing",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-23T08:01:45.606131+00:00",
+    "entry_price": 276.2,
+    "entry_prob": 0.48,
+    "exit_time": "2026-11-23T10:46:16.401884+00:00",
+    "exit_price": 285.4,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 2.74,
+    "pnl_pct": -3.33,
+    "pnl_rub": -9.2,
+    "balance_after": 9809.55
   }
 ]
