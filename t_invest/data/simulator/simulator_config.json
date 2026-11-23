@@ -4,7 +4,7 @@
     "trail_mult": 1.5,
     "news_block": -0.5,
     "starvation_count": 0,
-    "last_crush_alert": 6,
+    "last_crush_alert": 0,
     "last_loss_alert": 0
   },
   "swing": {
