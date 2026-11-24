@@ -2560,5 +2560,14 @@
     "pnl_pct": 1.42,
     "pnl_rub": 4.0,
     "balance_after": 9991.03
+  },
+  {
+    "ticker": "UWGN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-24T09:01:32.925738+00:00",
+    "entry_price": 21.16,
+    "entry_prob": 0.6562
   }
 ]
