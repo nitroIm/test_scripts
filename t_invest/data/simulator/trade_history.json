@@ -2621,5 +2621,14 @@
     "pnl_pct": 1.13,
     "pnl_rub": 0.24,
     "balance_after": 10900.53
+  },
+  {
+    "ticker": "UWGN",
+    "mode": "swing",
+    "side": "long",
+    "type": "BUY",
+    "entry_time": "2026-11-24T12:01:32.935565+00:00",
+    "entry_price": 21.06,
+    "entry_prob": 0.5
   }
 ]
