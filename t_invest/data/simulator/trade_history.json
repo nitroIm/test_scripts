@@ -2587,5 +2587,39 @@
     "entry_time": "2026-11-24T10:01:35.084598+00:00",
     "entry_price": 287.8,
     "entry_prob": 0.6149
+  },
+  {
+    "ticker": "BELU",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-24T10:01:35.084598+00:00",
+    "entry_price": 287.8,
+    "entry_prob": 0.7544719780083476,
+    "exit_time": "2026-11-24T10:31:39.509948+00:00",
+    "exit_price": 282.8,
+    "reason": "TAKE_PROFIT",
+    "duration_hours": 0.5,
+    "pnl_pct": 1.74,
+    "pnl_rub": 5.0,
+    "balance_after": 10879.13
+  },
+  {
+    "ticker": "UWGN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-24T09:01:32.925738+00:00",
+    "entry_price": 21.16,
+    "entry_prob": 0.6562208409950349,
+    "exit_time": "2026-11-24T10:31:39.509948+00:00",
+    "exit_price": 20.92,
+    "reason": "TAKE_PROFIT",
+    "duration_hours": 1.5,
+    "pnl_pct": 1.13,
+    "pnl_rub": 0.24,
+    "balance_after": 10900.53
   }
 ]
