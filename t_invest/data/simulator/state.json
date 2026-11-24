@@ -239,9 +239,9 @@
       },
       "tp": 279.166,
       "sl": 296.434,
-      "trailing_stop": 291.284,
+      "trailing_stop": 289.01800000000003,
       "highest": 287.8,
-      "lowest": 282.8,
+      "lowest": 280.6,
       "exit_time": "2026-11-26T10:01:35.084598+00:00",
       "figi": "BBG000TY1CD1"
     },
@@ -312,7 +312,7 @@
       "tp": 276.942,
       "sl": 272.829,
       "trailing_stop": 272.829,
-      "highest": 274.2,
+      "highest": 274.4,
       "lowest": 274.2,
       "exit_time": "2026-11-25T01:16:11.708563+00:00",
       "figi": "BBG00F6NKQX3"
