@@ -2682,5 +2682,14 @@
     "pnl_pct": -1.97,
     "pnl_rub": -5.4,
     "balance_after": 10252.13
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "swing",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-24T14:31:24.338405+00:00",
+    "entry_price": 267.1,
+    "entry_prob": 0.5184
   }
 ]
