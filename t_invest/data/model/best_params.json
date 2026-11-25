@@ -1,37 +1,37 @@
 {
   "trainer_version": "7.4-online-custom-180d",
-  "updated_at": "2026-11-24T06:31:35.494995+00:00",
+  "updated_at": "2026-11-25T06:31:34.955459+00:00",
   "long_tickers": [
     "SMLT",
+    "LSRG",
     "MVID",
     "WUSH",
-    "BELU",
-    "UWGN"
+    "BELU"
   ],
   "short_tickers": [
     "SMLT",
+    "LSRG",
     "MVID",
     "WUSH",
-    "BELU",
-    "UWGN"
+    "BELU"
   ],
   "intraday": {
     "long": {
       "params": {
-        "tp_pct": 1.0,
+        "tp_pct": 1.5,
         "sl_pct": 0.5,
-        "time_exit_h": 12,
-        "model_type": "xgb"
+        "time_exit_h": 8,
+        "model_type": "logreg"
       },
       "metrics": {
-        "trades": 543,
-        "pnl": 6.59,
-        "winrate": 0.4696,
-        "max_dd": -6.84,
-        "score": 0.96
+        "trades": 476,
+        "pnl": -4.22,
+        "winrate": 0.4454,
+        "max_dd": -11.68,
+        "score": -0.36
       },
       "model_path": "t_invest/data/model/best_intraday_long.pkl",
-      "source": "model_xgb"
+      "source": "model_logreg"
     },
     "short": {
       "params": {
@@ -41,11 +41,11 @@
         "model_type": "catboost"
       },
       "metrics": {
-        "trades": 464,
-        "pnl": 11.18,
-        "winrate": 0.5668,
-        "max_dd": -7.43,
-        "score": 1.5
+        "trades": 309,
+        "pnl": 14.29,
+        "winrate": 0.5761,
+        "max_dd": -4.51,
+        "score": 3.16
       },
       "model_path": "t_invest/data/model/best_intraday_short.pkl",
       "source": "model_catboost"
@@ -55,41 +55,41 @@
     "long": {
       "params": {
         "tp_pct": 8.0,
-        "sl_pct": 3.0,
+        "sl_pct": 2.0,
         "time_exit_h": 48,
-        "model_type": "rf"
+        "model_type": "lgbm"
       },
       "metrics": {
-        "trades": 87,
-        "pnl": 6.63,
-        "winrate": 0.4253,
-        "max_dd": -9.71,
-        "score": 0.68
+        "trades": 117,
+        "pnl": 2.32,
+        "winrate": 0.359,
+        "max_dd": -7.33,
+        "score": 0.32
       },
       "model_path": "t_invest/data/model/best_swing_long.pkl",
-      "source": "model_rf"
+      "source": "model_lgbm"
     },
     "short": {
       "params": {
         "tp_pct": 3.0,
         "sl_pct": 3.0,
-        "time_exit_h": 48,
-        "model_type": "lgbm"
+        "time_exit_h": 72,
+        "model_type": "rf"
       },
       "metrics": {
-        "trades": 124,
-        "pnl": 18.52,
-        "winrate": 0.6129,
-        "max_dd": -4.84,
-        "score": 3.82
+        "trades": 84,
+        "pnl": 18.59,
+        "winrate": 0.6429,
+        "max_dd": -4.26,
+        "score": 4.37
       },
       "model_path": "t_invest/data/model/best_swing_short.pkl",
-      "source": "model_lgbm"
+      "source": "model_rf"
     }
   },
   "stats": {
-    "total_rows": 16622,
-    "elapsed_seconds": 44,
+    "total_rows": 16544,
+    "elapsed_seconds": 46,
     "fetch_errors": 0
   }
 }
