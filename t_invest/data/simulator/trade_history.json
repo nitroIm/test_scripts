@@ -2760,5 +2760,14 @@
     "entry_time": "2026-11-25T08:46:22.741177+00:00",
     "entry_price": 274.1,
     "entry_prob": 0.47
+  },
+  {
+    "ticker": "BELU",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-25T09:01:41.798819+00:00",
+    "entry_price": 278.2,
+    "entry_prob": 0.7411
   }
 ]
