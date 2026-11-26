@@ -2890,5 +2890,22 @@
     "pnl_pct": -1.21,
     "pnl_rub": -3.3,
     "balance_after": 11371.94
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "swing",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-25T08:46:22.741177+00:00",
+    "entry_price": 274.1,
+    "entry_prob": 0.47,
+    "exit_time": "2026-11-26T10:46:26.976006+00:00",
+    "exit_price": 281.5,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 26.0,
+    "pnl_pct": -2.7,
+    "pnl_rub": -7.4,
+    "balance_after": 11092.71
   }
 ]
