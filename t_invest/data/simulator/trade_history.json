@@ -2942,5 +2942,14 @@
     "entry_time": "2026-11-26T13:01:45.472574+00:00",
     "entry_price": 20.08,
     "entry_prob": 0.4793
+  },
+  {
+    "ticker": "UWGN",
+    "mode": "swing",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-26T13:16:13.050132+00:00",
+    "entry_price": 20.14,
+    "entry_prob": "0.4726"
   }
 ]
