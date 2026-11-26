@@ -2907,5 +2907,31 @@
     "pnl_pct": -2.7,
     "pnl_rub": -7.4,
     "balance_after": 11092.71
+  },
+  {
+    "ticker": "UWGN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "WIN",
+    "entry_time": "2026-11-26T08:46:18.514331+00:00",
+    "entry_price": 20.24,
+    "entry_prob": 0.6852413600936109,
+    "exit_time": "2026-11-26T11:31:31.247254+00:00",
+    "exit_price": 20.02,
+    "reason": "TAKE_PROFIT",
+    "duration_hours": 2.75,
+    "pnl_pct": 1.09,
+    "pnl_rub": 0.22,
+    "balance_after": 10564.83
+  },
+  {
+    "ticker": "UWGN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-26T11:31:31.247254+00:00",
+    "entry_price": 20.02,
+    "entry_prob": 0.6804
   }
 ]
