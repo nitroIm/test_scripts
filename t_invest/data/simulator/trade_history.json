@@ -2873,5 +2873,22 @@
     "entry_time": "2026-11-26T08:46:18.514331+00:00",
     "entry_price": 20.24,
     "entry_prob": 0.6852
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-26T08:16:17.894852+00:00",
+    "entry_price": 272.9,
+    "entry_prob": 0.6605636747042791,
+    "exit_time": "2026-11-26T10:01:46.038976+00:00",
+    "exit_price": 276.2,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 1.76,
+    "pnl_pct": -1.21,
+    "pnl_rub": -3.3,
+    "balance_after": 11371.94
   }
 ]
