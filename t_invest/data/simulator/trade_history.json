@@ -2951,5 +2951,22 @@
     "entry_time": "2026-11-26T13:16:13.050132+00:00",
     "entry_price": 20.14,
     "entry_prob": "0.4726"
+  },
+  {
+    "ticker": "UWGN",
+    "mode": "intraday",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-26T11:31:31.247254+00:00",
+    "entry_price": 20.02,
+    "entry_prob": 0.6803861690164537,
+    "exit_time": "2026-11-26T15:31:30.327937+00:00",
+    "exit_price": 20.28,
+    "reason": "TRAILING_STOP",
+    "duration_hours": 4.0,
+    "pnl_pct": -1.3,
+    "pnl_rub": -0.26,
+    "balance_after": 10564.06
   }
 ]
