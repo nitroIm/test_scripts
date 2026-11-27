@@ -2977,5 +2977,14 @@
     "entry_time": "2026-11-27T07:01:40.670308+00:00",
     "entry_price": 281.8,
     "entry_prob": 0.5816
+  },
+  {
+    "ticker": "SMLT",
+    "mode": "intraday",
+    "side": "short",
+    "type": "BUY",
+    "entry_time": "2026-11-27T11:31:27.273347+00:00",
+    "entry_price": 283.1,
+    "entry_prob": 0.69
   }
 ]
