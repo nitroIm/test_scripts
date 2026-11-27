@@ -3029,5 +3029,22 @@
     "pnl_pct": -6.25,
     "pnl_rub": -17.6,
     "balance_after": 10765.59
+  },
+  {
+    "ticker": "UWGN",
+    "mode": "swing",
+    "side": "short",
+    "type": "SELL",
+    "result": "LOSS",
+    "entry_time": "2026-11-26T13:16:13.050132+00:00",
+    "entry_price": 20.14,
+    "entry_prob": "0.472623",
+    "exit_time": "2026-11-27T13:16:22.683415+00:00",
+    "exit_price": 20.46,
+    "reason": "TIME_EXIT",
+    "duration_hours": 24.0,
+    "pnl_pct": -1.59,
+    "pnl_rub": -0.32,
+    "balance_after": 10221.71
   }
 ]
